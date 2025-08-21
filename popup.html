@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Google Maps Leads Scraper</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Google Maps Leads Scraper</h1>
+        
+        <div class="controls">
+            <button id="startBtn" class="btn btn-primary">Start Scraping</button>
+            <button id="stopBtn" class="btn btn-danger" style="display: none;">Stop Scraping</button>
+            <button id="exportBtn" class="btn btn-success">Export CSV</button>
+        </div>
+        
+        <div class="status">
+            <p id="statusText">Ready to scrape</p>
+            <p id="progressText"></p>
+        </div>
+        
+        <div class="results">
+            <h3>Scraped Leads (<span id="resultsCount">0</span>)</h3>
+            <div id="resultsList"></div>
+        </div>
+        
+        <div class="settings">
+            <h3>Settings</h3>
+            <label>
+                <input type="checkbox" id="extractPhones" checked>
+                Extract Phone Numbers
+            </label>
+            <label>
+                <input type="checkbox" id="extractEmails" checked>
+                Extract Email Addresses
+            </label>
+            <label>
+                <input type="checkbox" id="autoScroll" checked>
+                Auto-scroll for More Results
+            </label>
+            <label>
+                <input type="checkbox" id="debugMode">
+                Debug Mode
+            </label>
+        </div>
+        
+        <div id="debugInfo" class="debug-info" style="display: none;">
+            <h3>Debug Information</h3>
+            <p><strong>Current URL:</strong> <span id="currentUrl"></span></p>
+            <p><strong>Google Maps Detected:</strong> <span id="mapsDetected"></span></p>
+            <p><strong>Visible Results:</strong> <span id="visibleResults"></span></p>
+            <p><strong>Last Error:</strong> <span id="lastError"></span></p>
+            <button id="inspectPage" class="btn btn-info">Inspect Page</button>
+        </div>
+        
+        <div id="inspectionResults" class="inspection-results" style="display: none;">
+            <h3>Page Inspection Results</h3>
+            <div id="inspectionData"></div>
+        </div>
+    </div>
+    
+    <script src="popup.js"></script>
+</body>
+</html>
