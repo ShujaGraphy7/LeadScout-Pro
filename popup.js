@@ -51,90 +51,125 @@ document.addEventListener('DOMContentLoaded', function() {
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         try {
             if (message.action === 'leadFound') {
+                console.log('Lead found:', message.lead);
+                
+                // Add the new lead to our list
                 scrapedLeads.push(message.lead);
+                
+                // Update the results display
                 updateResultsList();
-                updateStatus(`Found ${scrapedLeads.length} leads`);
-            } else if (message.action === 'updateProgress') {
-                updateProgress(`${message.current}/${message.total} leads found`);
+                
+                // Update the status with new count
+                if (message.totalCount) {
+                    updateStatus(`Scraping in progress... Found ${message.totalCount} leads`);
+                } else {
+                    updateStatus(`Scraping in progress... Found ${scrapedLeads.length} leads`);
+                }
+                
+                // Send response back
+                sendResponse({ success: true });
+                
             } else if (message.action === 'scrapingComplete') {
-                isScraping = false;
-                startBtn.style.display = 'inline-block';
-                stopBtn.style.display = 'none';
-                updateStatus('Scraping completed');
+                console.log('Scraping completed');
+                updateStatus(`Scraping completed! Found ${scrapedLeads.length} leads`);
+                
+                // Hide stop button and show start button
+                document.getElementById('startBtn').style.display = 'inline-flex';
+                document.getElementById('stopBtn').style.display = 'none';
+                
+                // Send response back
+                sendResponse({ success: true });
+                
+            } else if (message.action === 'scrapingStarted') {
+                console.log('Scraping started');
+                updateStatus('Scraping started...');
+                
+                // Show stop button and hide start button
+                document.getElementById('startBtn').style.display = 'none';
+                document.getElementById('stopBtn').style.display = 'inline-flex';
+                
+                // Send response back
+                sendResponse({ success: true });
+                
+            } else if (message.action === 'scrapingStopped') {
+                console.log('Scraping stopped');
+                updateStatus(`Scraping stopped. Found ${scrapedLeads.length} leads`);
+                
+                // Hide stop button and show start button
+                document.getElementById('startBtn').style.display = 'inline-flex';
+                document.getElementById('stopBtn').style.display = 'none';
+                
+                // Send response back
+                sendResponse({ success: true });
             }
         } catch (error) {
-            console.log('Error handling message:', error);
+            console.error('Error handling message:', error);
+            sendResponse({ success: false, error: error.message });
         }
-        
-        // Always send a response to prevent connection errors
-        sendResponse({ success: true });
     });
 
-    function startScraping() {
-        if (isScraping) return;
-
-        getCurrentTab().then(async (currentTab) => {
-            if (!currentTab) return;
-
-            if (!currentTab.url.includes('google.com/maps') && !currentTab.url.includes('maps.google.com')) {
-                alert('Please navigate to Google Maps to start scraping.');
-                return;
-            }
-
+    async function startScraping() {
+        try {
+            console.log('Starting scraping...');
+            
             // Check if content script is available
-            const contentScriptReady = await checkContentScriptAvailable();
-            if (!contentScriptReady) {
-                alert('Extension is not ready. Please refresh the page and try again.');
+            const isAvailable = await checkContentScriptAvailable();
+            if (!isAvailable) {
+                updateStatus('Error: Content script not available. Please refresh the page.');
                 return;
             }
-
-            const settings = {
-                extractPhones: document.getElementById('extractPhones').checked,
-                extractEmails: false, // Email functionality disabled
-                autoScroll: document.getElementById('autoScroll').checked
-            };
-
-            saveSettings(settings);
-
-            try {
-                const response = await sendMessageToContentScript({ action: 'startScraping', settings: settings });
-                if (response && response.success) {
-                    isScraping = true;
-                    startBtn.style.display = 'none';
-                    stopBtn.style.display = 'inline-block';
-                    updateStatus('Scraping started...');
-                    updateProgress('0 leads found');
-                } else {
-                    alert('Failed to start scraping. Make sure you\'re on Google Maps.');
-                }
-            } catch (error) {
-                console.log('Error starting scraping:', error);
-                alert('Failed to start scraping. Please refresh the page and try again.');
+            
+            // Clear previous results
+            scrapedLeads = [];
+            updateResultsList();
+            
+            // Update UI
+            updateStatus('Starting scraper...');
+            document.getElementById('startBtn').style.display = 'none';
+            document.getElementById('stopBtn').style.display = 'inline-flex';
+            
+            // Send start command to content script
+            const response = await sendMessageToContentScript({ action: 'startScraping' });
+            
+            if (response && response.success) {
+                updateStatus('Scraping started...');
+                console.log('Scraping started successfully');
+            } else {
+                updateStatus('Error starting scraper');
+                document.getElementById('startBtn').style.display = 'inline-flex';
+                document.getElementById('stopBtn').style.display = 'none';
             }
-        });
+            
+        } catch (error) {
+            console.error('Error starting scraping:', error);
+            updateStatus(`Error: ${error.message}`);
+            document.getElementById('startBtn').style.display = 'inline-flex';
+            document.getElementById('stopBtn').style.display = 'none';
+        }
     }
 
-    function stopScraping() {
-        if (!isScraping) return;
-
-        getCurrentTab().then(async (currentTab) => {
-            if (!currentTab) return;
-
-            try {
-                await sendMessageToContentScript({ action: 'stopScraping' });
-                isScraping = false;
-                startBtn.style.display = 'inline-block';
-                stopBtn.style.display = 'none';
-                updateStatus('Scraping stopped');
-            } catch (error) {
-                console.log('Error stopping scraping:', error);
-                // Even if message fails, update UI
-                isScraping = false;
-                startBtn.style.display = 'inline-block';
-                stopBtn.style.display = 'none';
-                updateStatus('Scraping stopped');
+    async function stopScraping() {
+        try {
+            console.log('Stopping scraping...');
+            
+            // Send stop command to content script
+            const response = await sendMessageToContentScript({ action: 'stopScraping' });
+            
+            if (response && response.success) {
+                updateStatus(`Scraping stopped. Found ${scrapedLeads.length} leads`);
+                console.log('Scraping stopped successfully');
+            } else {
+                updateStatus('Error stopping scraper');
             }
-        });
+            
+            // Update UI
+            document.getElementById('startBtn').style.display = 'inline-flex';
+            document.getElementById('stopBtn').style.display = 'none';
+            
+        } catch (error) {
+            console.error('Error stopping scraping:', error);
+            updateStatus(`Error: ${error.message}`);
+        }
     }
 
     function addLead(lead) {

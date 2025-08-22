@@ -17,37 +17,58 @@ class GoogleMapsScraper {
     }
 
     setupMessageListener() {
-        chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-            console.log('Message received:', request);
-            
-            switch (request.action) {
-                case 'startScraping':
-                    this.startScraping(request.settings);
+        // Listen for messages from popup
+        chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+            try {
+                if (message.action === 'startScraping') {
+                    console.log('Received start scraping command');
+                    
+                    if (this.isScraping) {
+                        console.log('Scraping already in progress');
+                        sendResponse({ success: false, message: 'Scraping already in progress' });
+                        return;
+                    }
+                    
+                    // Send scraping started message
+                    chrome.runtime.sendMessage({ action: 'scrapingStarted' });
+                    
+                    // Start scraping in background
+                    this.scrapeLeads().then(() => {
+                        console.log('Scraping completed');
+                        chrome.runtime.sendMessage({ action: 'scrapingComplete' });
+                    }).catch((error) => {
+                        console.error('Scraping error:', error);
+                        chrome.runtime.sendMessage({ action: 'scrapingComplete' });
+                    });
+                    
                     sendResponse({ success: true });
-                    break;
                     
-                case 'stopScraping':
-                    this.stopScraping = true;
-                    this.isScraping = false;
+                } else if (message.action === 'stopScraping') {
+                    console.log('Received stop scraping command');
+                    this.stopScraping();
+                    
+                    // Send scraping stopped message
+                    chrome.runtime.sendMessage({ action: 'scrapingStopped' });
+                    
                     sendResponse({ success: true });
-                    break;
                     
-                case 'getScrapedLeads':
-                    sendResponse({ leads: this.scrapedLeads });
-                    break;
+                } else if (message.action === 'ping') {
+                    console.log('Received ping, responding with pong');
+                    sendResponse({ success: true, message: 'pong' });
                     
-                case 'inspectPage':
+                } else if (message.action === 'inspectPage') {
+                    console.log('Received inspect page command');
                     const inspectionData = this.inspectPage();
-                    sendResponse({ data: inspectionData });
-                    break;
+                    sendResponse({ success: true, data: inspectionData });
                     
-                case 'ping':
-                    // Respond to availability check
-                    sendResponse({ success: true, message: 'Content script ready' });
-                    break;
-                    
-                default:
-                    sendResponse({ success: false, error: 'Unknown action' });
+                } else if (message.action === 'getScrapedLeads') {
+                    console.log('Received get scraped leads command');
+                    sendResponse({ success: true, leads: this.getScrapedLeads() });
+                }
+                
+            } catch (error) {
+                console.error('Error handling message:', error);
+                sendResponse({ success: false, error: error.message });
             }
         });
     }
@@ -78,36 +99,27 @@ class GoogleMapsScraper {
     }
 
     inspectPage() {
-        const data = {
-            url: window.location.href,
-            title: document.title,
-            businessListings: this.getVisibleResults().length,
-            sampleListings: [],
-            selectors: {
-                businessContainer: '.Nv2PK.tH5CWc.THOPZb, .Nv2PK.THOPZb.CpccDe',
-                businessName: '.qBF1Pd.fontHeadlineSmall.kiIehc.Hi2drd, h1.DUwDvf.lfPIob',
-                businessType: 'button.DkEaL, .W4Efsd span span',
-                address: '.Io6YTe.fontBodyMedium.kR99db.fdkmkc, .W4Efsd span:last-child',
-                phone: '.UsdlK',
-                website: '.lcr4fd, a[data-item-id="authority"] .Io6YTe',
-                rating: '.MW4etd, .fontDisplayLarge',
-                reviews: '.UY7F9, button.GQjSyb span'
-            }
-        };
-
-        // Get sample listings for inspection
-        const listings = this.getVisibleResults().slice(0, 3);
-        listings.forEach((listing, index) => {
-            const sample = {
-                index: index + 1,
-                name: listing.querySelector('.qBF1Pd')?.textContent?.trim() || 'Not found',
-                type: listing.querySelector('.W4Efsd span span')?.textContent?.trim() || 'Not found',
-                address: listing.querySelector('.W4Efsd span:last-child')?.textContent?.trim() || 'Not found'
+        try {
+            const inspectionData = {
+                url: window.location.href,
+                title: document.title,
+                totalListings: this.getVisibleResults().length,
+                scrollableContainer: this.findScrollableContainer() ? 'Found' : 'Not found',
+                canScroll: this.canScrollFurther(),
+                timestamp: new Date().toISOString()
             };
-            data.sampleListings.push(sample);
-        });
+            
+            console.log('Page inspection data:', inspectionData);
+            return inspectionData;
+            
+        } catch (error) {
+            console.error('Error inspecting page:', error);
+            return { error: error.message };
+        }
+    }
 
-        return data;
+    getScrapedLeads() {
+        return this.scrapedLeads;
     }
 
     findBusinessElements() {
@@ -611,91 +623,131 @@ class GoogleMapsScraper {
     }
 
     async scrapeLeads() {
+        if (this.isScraping) {
+            console.log('Scraping already in progress');
+            return;
+        }
+
+        this.isScraping = true;
+        this.stopScraping = false;
+        this.scrapedLeads = [];
+        this.scrapedCount = 0;
+        
+        console.log('Starting lead scraping...');
+        
         try {
-            console.log('Starting lead scraping...');
+            // Wait for Google Maps to fully load
+            await this.waitForMapsToLoad();
             
-            const listings = this.getVisibleResults();
-            if (listings.length === 0) {
-                console.log('No business listings found');
-                return;
-            }
-
-            console.log(`Found ${listings.length} business listings`);
-
-            // Track processed listings to avoid duplicates
-            const processedNames = new Set();
-
-            for (let i = 0; i < listings.length; i++) {
-                if (this.stopScraping) {
-                    console.log('Scraping stopped by user');
-                    break;
-                }
-
-                // Ensure we're still on the search results page
-                if (!await this.ensureSearchResultsPage()) {
-                    console.log('Cannot return to search results page, stopping scraping');
-                    break;
-                }
-
-                const listing = listings[i];
-                const listingName = this.extractBasicInfo(listing).name;
+            // Get initial business listings
+            this.businessListings = this.getVisibleResults();
+            console.log(`Initial listings found: ${this.businessListings.length}`);
+            
+            // Process all available listings
+            let processedCount = 0;
+            let totalProcessed = 0;
+            
+            while (this.isScraping && !this.stopScraping) {
+                // Get current listings (this will include newly discovered ones)
+                const currentListings = this.getVisibleResults();
+                console.log(`Current total listings available: ${currentListings.length}`);
                 
-                console.log(`Processing listing ${i + 1}/${listings.length}: ${listingName || 'Unknown'}`);
-
-                // Check if we've already processed this listing
-                if (processedNames.has(listingName)) {
-                    console.log(`Skipping already processed listing: ${listingName}`);
-                    continue;
-                }
-
-                // Use the enhanced extraction method that clicks and opens detailed panels
-                const leadInfo = await this.safeExtractDetails(listing);
-                console.log('Lead info extracted:', leadInfo);
+                // Process only unprocessed listings
+                const unprocessedListings = currentListings.slice(processedCount);
+                console.log(`Processing ${unprocessedListings.length} new listings`);
                 
-                // Clean and validate the data
-                const cleanedInfo = this.cleanBusinessData(leadInfo);
-                
-                if (cleanedInfo.name && this.isValidBusinessName(cleanedInfo.name)) {
-                    this.scrapedLeads.push(cleanedInfo);
-                    processedNames.add(cleanedInfo.name);
-                    console.log(`Successfully added lead ${i + 1}: ${cleanedInfo.name}`);
-                    
-                    // Update progress
-                    this.updateProgress(i + 1, listings.length);
-                    
-                    // Send lead to popup immediately
-                    chrome.runtime.sendMessage({ 
-                        action: 'leadFound', 
-                        lead: cleanedInfo 
-                    });
-                } else {
-                    console.log(`Skipping invalid lead: ${cleanedInfo.name || 'No name'}`);
-                }
-
-                // Shorter wait since we're keeping panel open
-                await this.wait(1000);
-                
-                // Check if we need to load more listings
-                if (i > 0 && i % 5 === 0) {
-                    console.log('Checking for more business listings...');
-                    const newCount = await this.loadMoreListings();
-                    if (newCount > listings.length) {
-                        console.log(`Found ${newCount - listings.length} new listings`);
-                        // Update our list with new listings
-                        const newListings = this.getVisibleResults();
-                        listings.push(...newListings.slice(listings.length));
+                if (unprocessedListings.length === 0) {
+                    console.log('No new listings to process, attempting to load more...');
+                    if (this.canScrollFurther()) {
+                        await this.loadMoreListings();
+                        // Wait a bit for new content to load
+                        await this.wait(2000);
+                        continue; // Continue the loop to process new listings
+                    } else {
+                        console.log('Cannot scroll further and no new listings, scraping complete');
+                        break;
                     }
                 }
+                
+                // Process each unprocessed listing
+                for (let i = 0; i < unprocessedListings.length && this.isScraping && !this.stopScraping; i++) {
+                    const listing = unprocessedListings[i];
+                    const globalIndex = processedCount + i;
+                    
+                    try {
+                        console.log(`Processing business ${globalIndex + 1}/${currentListings.length}: ${listing.textContent?.substring(0, 50)}...`);
+                        
+                        // Extract basic info from the listing card first
+                        const basicInfo = this.extractBasicInfo(listing);
+                        console.log('Basic info extracted:', basicInfo);
+                        
+                        // Click on the listing to open detailed view
+                        const detailedInfo = await this.clickAndExtractDetails(listing);
+                        console.log('Detailed info extracted:', detailedInfo);
+                        
+                        // Combine basic and detailed info
+                        const lead = { ...basicInfo, ...detailedInfo };
+                        
+                        if (lead.name && this.isValidBusinessName(lead.name)) {
+                            // Check if this lead is already processed
+                            const isDuplicate = this.scrapedLeads.some(existing => 
+                                existing.name === lead.name && existing.address === lead.address
+                            );
+                            
+                            if (!isDuplicate) {
+                                this.scrapedCount++;
+                                this.scrapedLeads.push(lead);
+                                console.log(`New lead extracted (${this.scrapedCount} total):`, lead.name);
+                                
+                                // Send message to popup with updated count
+                                chrome.runtime.sendMessage({ 
+                                    action: 'leadFound', 
+                                    lead: lead,
+                                    totalCount: this.scrapedCount
+                                });
+                            } else {
+                                console.log(`Duplicate lead skipped: ${lead.name}`);
+                            }
+                        }
+                        
+                        // Wait before processing next listing
+                        await this.wait(1000);
+                        
+                    } catch (error) {
+                        console.error(`Error processing business ${globalIndex + 1}:`, error);
+                    }
+                }
+                
+                // Update processed count
+                processedCount = currentListings.length;
+                totalProcessed += unprocessedListings.length;
+                
+                console.log(`Processed ${totalProcessed} total listings, found ${this.scrapedCount} unique leads`);
+                
+                // Check if we've reached max results
+                if (this.maxResults && this.scrapedCount >= this.maxResults) {
+                    console.log(`Reached maximum results limit: ${this.maxResults}`);
+                    break;
+                }
+                
+                // Try to load more listings if we can scroll further
+                if (this.canScrollFurther()) {
+                    console.log('Attempting to load more listings...');
+                    await this.loadMoreListings();
+                    await this.wait(2000); // Wait for new content
+                } else {
+                    console.log('Cannot scroll further, scraping complete');
+                    break;
+                }
             }
-
-            console.log(`Scraping completed. Found ${this.scrapedLeads.length} leads`);
             
-            // Send completion message
-            chrome.runtime.sendMessage({ action: 'scrapingComplete' });
+            console.log(`Scraping completed. Total leads found: ${this.scrapedCount}`);
             
         } catch (error) {
             console.error('Error during scraping:', error);
-            chrome.runtime.sendMessage({ action: 'scrapingComplete' });
+        } finally {
+            this.isScraping = false;
+            console.log('Scraping stopped');
         }
     }
 
@@ -772,31 +824,125 @@ class GoogleMapsScraper {
         return this.isOnSearchResultsPage();
     }
 
+    findScrollableContainer() {
+        // Multiple selectors to find the scrollable container for Google Maps results
+        const selectors = [
+            '.e07Vkf.kA9KIf[tabindex="-1"]', // Primary scrollable container
+            '.aIFcqe', // Alternative container
+            '.m6QErb.DxyBCb.kA9KIf.dS8AEf.XiKgde.ecceSd', // Results feed container
+            '.m6QErb.DxyBCb.kA9KIf.dS8AEf.XiKgde', // Results container
+            '.m6QErb[role="feed"]', // Feed role container
+            '.m6QErb.XiKgde.z7i0C', // Results wrapper
+            '.m6QErb.DxyBCb.kA9KIf.dS8AEf.XiKgde.ecceSd[tabindex="-1"]' // Tabindex container
+        ];
+        
+        for (const selector of selectors) {
+            const container = document.querySelector(selector);
+            if (container && container.scrollHeight > container.clientHeight) {
+                console.log(`Found scrollable container with selector: ${selector}`);
+                return container;
+            }
+        }
+        
+        // Fallback: look for any container with scrollable content
+        const allContainers = document.querySelectorAll('.m6QErb, .e07Vkf, .aIFcqe');
+        for (const container of allContainers) {
+            if (container.scrollHeight > container.clientHeight && container.scrollTop !== undefined) {
+                console.log('Found scrollable container through fallback search');
+                return container;
+            }
+        }
+        
+        console.log('No scrollable container found');
+        return null;
+    }
+
+    canScrollFurther() {
+        const container = this.findScrollableContainer();
+        if (!container) return false;
+        
+        const currentScrollTop = container.scrollTop;
+        const scrollHeight = container.scrollHeight;
+        const clientHeight = container.clientHeight;
+        
+        // Check if we can scroll down further
+        return currentScrollTop + clientHeight < scrollHeight - 50;
+    }
+
     async loadMoreListings() {
-        // Try to scroll down to load more business listings
         try {
-            console.log('Attempting to load more business listings...');
+            console.log('Attempting to load more listings...');
             
-            // Scroll to the bottom of the results
-            const resultsContainer = document.querySelector('.m6QErb.DxyBCb.kA9KIf.dS8AEf.XiKgde') ||
-                                   document.querySelector('.m6QErb') ||
-                                   document.querySelector('main');
+            // Find the specific scrollable container for Google Maps results
+            const scrollableContainer = this.findScrollableContainer();
             
-            if (resultsContainer) {
-                resultsContainer.scrollIntoView({ behavior: 'smooth', block: 'end' });
-                await this.wait(2000);
-                
-                // Check if new listings appeared
-                const currentCount = this.getVisibleResults().length;
-                console.log(`Current listings count: ${currentCount}`);
-                
-                return currentCount;
+            if (!scrollableContainer) {
+                console.log('Scrollable container not found');
+                return;
             }
             
-            return 0;
+            console.log('Found scrollable container:', scrollableContainer);
+            
+            // Get current scroll position
+            const currentScrollTop = scrollableContainer.scrollTop;
+            const scrollHeight = scrollableContainer.scrollHeight;
+            const clientHeight = scrollableContainer.clientHeight;
+            
+            console.log(`Current scroll: ${currentScrollTop}, Height: ${scrollHeight}, Client: ${clientHeight}`);
+            
+            // Check if we're near the bottom
+            if (currentScrollTop + clientHeight >= scrollHeight - 100) {
+                console.log('Already at bottom, no more scrolling needed');
+                return;
+            }
+            
+            // Try different scrolling strategies
+            const scrollStrategies = [
+                // Strategy 1: Scroll by 80% of viewport height
+                () => scrollableContainer.scrollTo({
+                    top: currentScrollTop + (clientHeight * 0.8),
+                    behavior: 'smooth'
+                }),
+                // Strategy 2: Scroll to specific position
+                () => scrollableContainer.scrollTo({
+                    top: currentScrollTop + 500,
+                    behavior: 'smooth'
+                }),
+                // Strategy 3: Scroll to bottom
+                () => scrollableContainer.scrollTo({
+                    top: scrollHeight,
+                    behavior: 'smooth'
+                })
+            ];
+            
+            let newContentLoaded = false;
+            
+            for (let i = 0; i < scrollStrategies.length && !newContentLoaded; i++) {
+                console.log(`Trying scroll strategy ${i + 1}`);
+                
+                // Execute scroll strategy
+                scrollStrategies[i]();
+                
+                // Wait for content to load
+                await this.wait(3000);
+                
+                // Check if new content was loaded
+                const newScrollHeight = scrollableContainer.scrollHeight;
+                if (newScrollHeight > scrollHeight) {
+                    console.log(`New content loaded with strategy ${i + 1}! Height increased from ${scrollHeight} to ${newScrollHeight}`);
+                    newContentLoaded = true;
+                    break;
+                } else {
+                    console.log(`Strategy ${i + 1} did not load new content`);
+                }
+            }
+            
+            if (!newContentLoaded) {
+                console.log('No new content loaded after trying all scroll strategies');
+            }
+            
         } catch (error) {
-            console.log('Error loading more listings:', error);
-            return 0;
+            console.error('Error in loadMoreListings:', error);
         }
     }
 
