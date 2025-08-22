@@ -161,36 +161,179 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function exportCSV() {
         if (scrapedLeads.length === 0) {
-            alert('No leads to export.');
+            alert('No leads to export!');
             return;
         }
 
-        const csvContent = generateCSV();
-        const blob = new Blob([csvContent], { type: 'text/csv' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `google-maps-leads-${new Date().toISOString().split('T')[0]}.csv`;
-        a.click();
-        window.URL.revokeObjectURL(url);
-    }
-
-    function generateCSV() {
-        const headers = ['Business Name', 'Business Type', 'Address', 'Phone', 'Website', 'Rating', 'Hours', 'Services'];
-        const rows = scrapedLeads.map(lead => [
-            lead.name || '',
-            lead.businessType || '',
-            lead.address || '',
-            lead.phone || '',
-            lead.website || '',
-            lead.rating || '',
-            lead.hours || '',
-            lead.services && lead.services.length > 0 ? lead.services.join('; ') : ''
-        ]);
-
-        return [headers, ...rows].map(row => 
-            row.map(field => `"${field}"`).join(',')
-        ).join('\n');
+        // Create XLS content with proper formatting
+        let xlsContent = '';
+        
+        // Add XLS header
+        xlsContent += '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">\n';
+        xlsContent += '<head>\n';
+        xlsContent += '<meta charset="UTF-8">\n';
+        xlsContent += '<style>\n';
+        xlsContent += 'table { border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; }\n';
+        xlsContent += '.header { background-color: #2c3e50; color: white; font-weight: bold; text-align: center; padding: 15px; font-size: 18px; }\n';
+        xlsContent += '.subheader { background-color: #34495e; color: white; font-weight: bold; text-align: center; padding: 10px; font-size: 14px; }\n';
+        xlsContent += '.section-header { background-color: #3498db; color: white; font-weight: bold; padding: 8px; font-size: 16px; }\n';
+        xlsContent += '.data-header { background-color: #ecf0f1; color: #2c3e50; font-weight: bold; padding: 8px; border: 1px solid #bdc3c7; }\n';
+        xlsContent += '.data-cell { padding: 6px; border: 1px solid #bdc3c7; vertical-align: top; }\n';
+        xlsContent += '.analysis-header { background-color: #27ae60; color: white; font-weight: bold; padding: 8px; font-size: 14px; }\n';
+        xlsContent += '.analysis-cell { padding: 6px; border: 1px solid #bdc3c7; background-color: #f8f9fa; }\n';
+        xlsContent += '.footer { background-color: #2c3e50; color: white; text-align: center; padding: 10px; font-size: 12px; }\n';
+        xlsContent += '.progress-bar { background-color: #3498db; color: white; text-align: center; font-weight: bold; }\n';
+        xlsContent += '.percentage { font-weight: bold; color: #2c3e50; }\n';
+        xlsContent += '</style>\n';
+        xlsContent += '</head>\n';
+        xlsContent += '<body>\n';
+        
+        // Main header
+        xlsContent += '<table>\n';
+        xlsContent += '<tr><td colspan="7" class="header">LeadScout Pro - Business Intelligence Report</td></tr>\n';
+        xlsContent += '<tr><td colspan="7" class="subheader">Professional Lead Analysis & Market Intelligence</td></tr>\n';
+        
+        // Report info
+        xlsContent += '<tr><td colspan="7" style="padding: 10px; background-color: #f8f9fa; border: 1px solid #e9ecef;">\n';
+        xlsContent += '<strong>Generated on:</strong> ' + new Date().toLocaleString() + '<br>\n';
+        xlsContent += '<strong>Total Leads Extracted:</strong> ' + scrapedLeads.length + '<br>\n';
+        xlsContent += '<strong>Search Target:</strong> Google Maps Business Listings\n';
+        xlsContent += '</td></tr>\n';
+        
+        // Data section header
+        xlsContent += '<tr><td colspan="7" class="section-header">Business Information Database</td></tr>\n';
+        
+        // Data headers
+        xlsContent += '<tr>\n';
+        xlsContent += '<td class="data-header">Business Name</td>\n';
+        xlsContent += '<td class="data-header">Business Type</td>\n';
+        xlsContent += '<td class="data-header">Address</td>\n';
+        xlsContent += '<td class="data-header">Phone</td>\n';
+        xlsContent += '<td class="data-header">Website</td>\n';
+        xlsContent += '<td class="data-header">Rating</td>\n';
+        xlsContent += '<td class="data-header">Status</td>\n';
+        xlsContent += '</tr>\n';
+        
+        // Data rows
+        scrapedLeads.forEach((lead, index) => {
+            xlsContent += '<tr>\n';
+            xlsContent += '<td class="data-cell">' + (lead.name || 'N/A') + '</td>\n';
+            xlsContent += '<td class="data-cell">' + (lead.businessType || 'N/A') + '</td>\n';
+            xlsContent += '<td class="data-cell">' + (lead.address || 'N/A') + '</td>\n';
+            xlsContent += '<td class="data-cell">' + (lead.phone || 'N/A') + '</td>\n';
+            xlsContent += '<td class="data-cell">' + (lead.website || 'N/A') + '</td>\n';
+            xlsContent += '<td class="data-cell">' + (lead.rating || 'N/A') + '</td>\n';
+            xlsContent += '<td class="data-cell">' + (lead.status || 'N/A') + '</td>\n';
+            xlsContent += '</tr>\n';
+        });
+        
+        // Analysis section
+        xlsContent += '<tr><td colspan="7" class="analysis-header">Market Intelligence & Analysis Report</td></tr>\n';
+        
+        // Business type analysis
+        const businessTypes = {};
+        scrapedLeads.forEach(lead => {
+            if (lead.businessType) {
+                businessTypes[lead.businessType] = (businessTypes[lead.businessType] || 0) + 1;
+            }
+        });
+        
+        xlsContent += '<tr><td colspan="7" class="section-header">Business Type Distribution Analysis</td></tr>\n';
+        Object.entries(businessTypes)
+            .sort(([,a], [,b]) => b - a)
+            .forEach(([type, count]) => {
+                const percentage = ((count / scrapedLeads.length) * 100).toFixed(1);
+                xlsContent += '<tr>\n';
+                xlsContent += '<td class="analysis-cell" colspan="3">' + type + '</td>\n';
+                xlsContent += '<td class="analysis-cell">' + count + '</td>\n';
+                xlsContent += '<td class="analysis-cell percentage">' + percentage + '%</td>\n';
+                xlsContent += '<td class="analysis-cell progress-bar" colspan="2">' + '#'.repeat(Math.round((count / scrapedLeads.length) * 20)) + '</td>\n';
+                xlsContent += '</tr>\n';
+            });
+        
+        // Rating analysis
+        const ratings = scrapedLeads.filter(lead => lead.rating && lead.rating !== 'N/A');
+        if (ratings.length > 0) {
+            const avgRating = ratings.reduce((sum, lead) => {
+                const rating = parseFloat(lead.rating);
+                return isNaN(rating) ? sum : sum + rating;
+            }, 0) / ratings.length;
+            
+            xlsContent += '<tr><td colspan="7" class="section-header">Rating Performance Analysis</td></tr>\n';
+            xlsContent += '<tr>\n';
+            xlsContent += '<td class="analysis-cell" colspan="3">Average Rating</td>\n';
+            xlsContent += '<td class="analysis-cell">' + avgRating.toFixed(1) + '/5.0</td>\n';
+            xlsContent += '<td class="analysis-cell" colspan="3">' + '*'.repeat(Math.round(avgRating)) + '</td>\n';
+            xlsContent += '</tr>\n';
+            xlsContent += '<tr>\n';
+            xlsContent += '<td class="analysis-cell" colspan="3">Businesses with Ratings</td>\n';
+            xlsContent += '<td class="analysis-cell">' + ratings.length + '/' + scrapedLeads.length + '</td>\n';
+            xlsContent += '<td class="analysis-cell percentage" colspan="2">' + ((ratings.length/scrapedLeads.length)*100).toFixed(1) + '%</td>\n';
+            xlsContent += '</tr>\n';
+        }
+        
+        // Status analysis
+        const openBusinesses = scrapedLeads.filter(lead => 
+            lead.status && lead.status.toLowerCase().includes('open')
+        ).length;
+        const closedBusinesses = scrapedLeads.filter(lead => 
+            lead.status && lead.status.toLowerCase().includes('closed')
+        ).length;
+        
+        xlsContent += '<tr><td colspan="7" class="section-header">Business Status Overview</td></tr>\n';
+        xlsContent += '<tr>\n';
+        xlsContent += '<td class="analysis-cell" colspan="3">Open Businesses</td>\n';
+        xlsContent += '<td class="analysis-cell">' + openBusinesses + '</td>\n';
+        xlsContent += '<td class="analysis-cell percentage" colspan="2">' + ((openBusinesses/scrapedLeads.length)*100).toFixed(1) + '%</td>\n';
+        xlsContent += '</tr>\n';
+        xlsContent += '<tr>\n';
+        xlsContent += '<td class="analysis-cell" colspan="3">Closed Businesses</td>\n';
+        xlsContent += '<td class="analysis-cell">' + closedBusinesses + '</td>\n';
+        xlsContent += '<td class="analysis-cell percentage" colspan="2">' + ((closedBusinesses/scrapedLeads.length)*100).toFixed(1) + '%</td>\n';
+        xlsContent += '</tr>\n';
+        xlsContent += '<tr>\n';
+        xlsContent += '<td class="analysis-cell" colspan="3">Status Unknown</td>\n';
+        xlsContent += '<td class="analysis-cell">' + (scrapedLeads.length - openBusinesses - closedBusinesses) + '</td>\n';
+        xlsContent += '<td class="analysis-cell percentage" colspan="2">' + (((scrapedLeads.length - openBusinesses - closedBusinesses)/scrapedLeads.length)*100).toFixed(1) + '%</td>\n';
+        xlsContent += '</tr>\n';
+        
+        // Contact information analysis
+        const withPhone = scrapedLeads.filter(lead => lead.phone && lead.phone !== 'N/A').length;
+        const withWebsite = scrapedLeads.filter(lead => lead.website && lead.website !== 'N/A').length;
+        
+        xlsContent += '<tr><td colspan="7" class="section-header">Contact Information Coverage</td></tr>\n';
+        xlsContent += '<tr>\n';
+        xlsContent += '<td class="analysis-cell" colspan="3">With Phone Numbers</td>\n';
+        xlsContent += '<td class="analysis-cell">' + withPhone + '/' + scrapedLeads.length + '</td>\n';
+        xlsContent += '<td class="analysis-cell percentage" colspan="2">' + ((withPhone/scrapedLeads.length)*100).toFixed(1) + '%</td>\n';
+        xlsContent += '</tr>\n';
+        xlsContent += '<tr>\n';
+        xlsContent += '<td class="analysis-cell" colspan="3">With Websites</td>\n';
+        xlsContent += '<td class="analysis-cell">' + withWebsite + '/' + scrapedLeads.length + '</td>\n';
+        xlsContent += '<td class="analysis-cell percentage" colspan="2">' + ((withWebsite/scrapedLeads.length)*100).toFixed(1) + '%</td>\n';
+        xlsContent += '</tr>\n';
+        
+        // Footer
+        xlsContent += '<tr><td colspan="7" class="footer">\n';
+        xlsContent += 'Report generated by LeadScout Pro | Developed with love by hashnetics<br>\n';
+        xlsContent += 'Open Source • Free for Everyone • Chrome Extension<br>\n';
+        xlsContent += 'Support: https://hashnetics.com | GitHub: https://github.com/ShujaGraphy7/LeadScout-Pro\n';
+        xlsContent += '</td></tr>\n';
+        
+        xlsContent += '</table>\n';
+        xlsContent += '</body>\n';
+        xlsContent += '</html>';
+        
+        // Create and download file
+        const blob = new Blob([xlsContent], { type: 'application/vnd.ms-excel' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `leadscout-pro-leads-${new Date().toISOString().split('T')[0]}.xls`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     }
 
     function toggleDebugMode() {

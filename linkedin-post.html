@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LeadScout Pro - Open Source Business Intelligence Extractor</title>
+    <style>
+        /* Reset and Base Styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: #ecf0f1;
+            line-height: 1.6;
+            overflow: hidden;
+        }
+
+        .container {
+            width: 1200px;
+            height: 628px;
+            background: #2c3e50;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header Section */
+        .header {
+            background: linear-gradient(135deg, #1a252f 0%, #2c3e50 100%);
+            padding: 40px 50px;
+            text-align: center;
+            position: relative;
+            border-bottom: 3px solid #34495e;
+            flex: 0 0 auto;
+        }
+
+        .logo {
+            display: inline-block;
+            margin-bottom: 20px;
+        }
+
+        .logo svg {
+            width: 80px;
+            height: 80px;
+        }
+
+        .title-section h1 {
+            color: #ecf0f1;
+            font-size: 48px;
+            font-weight: 700;
+            margin-bottom: 10px;
+            text-shadow: 0 4px 8px rgba(0,0,0,0.5);
+            letter-spacing: 2px;
+        }
+
+        .subtitle {
+            color: #bdc3c7;
+            font-size: 24px;
+            font-weight: 400;
+            letter-spacing: 1px;
+        }
+
+        .open-source-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-weight: 600;
+            font-size: 18px;
+            margin-top: 20px;
+            box-shadow: 0 4px 16px rgba(39, 174, 96, 0.4);
+            border: 2px solid #27ae60;
+        }
+
+        /* Features Section */
+        .features-section {
+            padding: 40px 50px;
+            background: #34495e;
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            align-items: center;
+        }
+
+        .feature-column {
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+        }
+
+        .feature-item {
+            background: #2c3e50;
+            padding: 25px;
+            border-radius: 16px;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+            border: 2px solid #34495e;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .feature-item:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.5);
+            border-color: #3498db;
+        }
+
+        .feature-item::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+        }
+
+        .feature-icon {
+            color: #3498db;
+            font-size: 24px;
+            margin-bottom: 15px;
+            display: block;
+        }
+
+        .feature-title {
+            color: #ecf0f1;
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .feature-description {
+            color: #bdc3c7;
+            font-size: 16px;
+            line-height: 1.5;
+        }
+
+        /* Footer Section */
+        .footer {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            padding: 30px 50px;
+            text-align: center;
+            border-top: 2px solid #34495e;
+            flex: 0 0 auto;
+        }
+
+        .footer-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .developer-info {
+            text-align: left;
+        }
+
+        .developer-info p {
+            margin: 0;
+            font-size: 16px;
+            color: #bdc3c7;
+        }
+
+        .developer-info a {
+            color: #3498db;
+            text-decoration: none;
+            font-weight: 600;
+            transition: color 0.3s ease;
+        }
+
+        .developer-info a:hover {
+            color: #2980b9;
+        }
+
+        .version {
+            background: #3498db;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .github-link {
+            background: linear-gradient(135deg, #333 0%, #555 100%);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 25px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+        }
+
+        .github-link:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+        }
+
+        /* Responsive adjustments for LinkedIn post size */
+        @media (max-width: 1200px) {
+            .container {
+                width: 100vw;
+                height: 100vh;
+            }
+            
+            .features-section {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header with Logo and Title -->
+        <div class="header">
+            <div class="logo">
+                <svg viewBox="0 0 32 32" fill="none">
+                    <circle cx="16" cy="16" r="15" fill="url(#gradient1)" stroke="url(#gradient2)" stroke-width="2"/>
+                    <path d="M8 12L16 20L24 12" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <circle cx="16" cy="8" r="3" fill="white"/>
+                    <circle cx="16" cy="24" r="3" fill="white"/>
+                    <defs>
+                        <linearGradient id="gradient1" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" style="stop-color:#667eea"/>
+                            <stop offset="100%" style="stop-color:#764ba2"/>
+                        </linearGradient>
+                        <linearGradient id="gradient2" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" style="stop-color:#f093fb"/>
+                            <stop offset="100%" style="stop-color:#f5576c"/>
+                        </linearGradient>
+                    </defs>
+                </svg>
+            </div>
+            <div class="title-section">
+                <h1>LeadScout Pro</h1>
+                <p class="subtitle">Business Intelligence Extractor</p>
+                <div class="open-source-badge">🔓 Open Source</div>
+            </div>
+        </div>
+
+        <!-- Features Section -->
+        <div class="features-section">
+            <div class="feature-column">
+                <div class="feature-item">
+                    <span class="feature-icon">🌐</span>
+                    <div class="feature-title">Chrome Extension</div>
+                    <div class="feature-description">Works seamlessly with Google Chrome browser</div>
+                </div>
+                
+                <div class="feature-item">
+                    <span class="feature-icon">🗺️</span>
+                    <div class="feature-title">Google Maps Integration</div>
+                    <div class="feature-description">Extracts leads directly from Google Maps search results</div>
+                </div>
+                
+                <div class="feature-item">
+                    <span class="feature-icon">📊</span>
+                    <div class="feature-title">Business Data Extraction</div>
+                    <div class="feature-description">Gets business names, types, addresses, phone numbers, websites, ratings, and status</div>
+                </div>
+            </div>
+            
+            <div class="feature-column">
+                <div class="feature-item">
+                    <span class="feature-icon">💾</span>
+                    <div class="feature-title">CSV Export</div>
+                    <div class="feature-description">Download extracted data in CSV format</div>
+                </div>
+                
+                <div class="feature-item">
+                    <span class="feature-icon">🔓</span>
+                    <div class="feature-title">Open Source</div>
+                    <div class="feature-description">Free and open source for everyone to use</div>
+                </div>
+                
+                <div class="feature-item">
+                    <span class="feature-icon">⚡</span>
+                    <div class="feature-title">Easy to Use</div>
+                    <div class="feature-description">Simple interface with start/stop controls</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer Section -->
+        <div class="footer">
+            <div class="footer-content">
+                <div class="developer-info">
+                    <p>Developed with ❤️ by <a href="https://hashnetics.com" target="_blank">hashnetics</a></p>
+                </div>
+                <div class="version">v0.5</div>
+                <a href="https://github.com/hashnetics/leadscout-pro" class="github-link" target="_blank">📁 View on GitHub</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
