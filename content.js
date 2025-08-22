@@ -3,16 +3,16 @@ class GoogleMapsScraper {
         this.isScraping = false;
         this.stopScraping = false;
         this.scrapedLeads = [];
-        this.maxResults = 100;
+        this.maxResults = 10; // Default to 10 leads
         this.currentIndex = 0;
         this.businessListings = [];
         this.scrapedCount = 0;
         
         this.init();
+        
     }
 
     init() {
-        console.log('Google Maps Scraper initialized');
         this.setupMessageListener();
     }
 
@@ -21,20 +21,21 @@ class GoogleMapsScraper {
         chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             try {
                 if (message.action === 'startScraping') {
-                    console.log('Received start scraping command');
                     
                     if (this.isScraping) {
-                        console.log('Scraping already in progress');
                         sendResponse({ success: false, message: 'Scraping already in progress' });
-                        return;
+                        return true;
                     }
+                    
+                    // Get settings including max leads
+                    const settings = message.settings || {};
+                    this.maxResults = settings.maxLeads || 10;
                     
                     // Send scraping started message
                     chrome.runtime.sendMessage({ action: 'scrapingStarted' });
                     
                     // Start scraping in background
                     this.scrapeLeads().then(() => {
-                        console.log('Scraping completed');
                         chrome.runtime.sendMessage({ action: 'scrapingComplete' });
                     }).catch((error) => {
                         console.error('Scraping error:', error);
@@ -42,33 +43,35 @@ class GoogleMapsScraper {
                     });
                     
                     sendResponse({ success: true });
+                    return true;
                     
                 } else if (message.action === 'stopScraping') {
-                    console.log('Received stop scraping command');
                     this.stopScraping();
                     
                     // Send scraping stopped message
                     chrome.runtime.sendMessage({ action: 'scrapingStopped' });
                     
                     sendResponse({ success: true });
+                    return true;
                     
                 } else if (message.action === 'ping') {
-                    console.log('Received ping, responding with pong');
                     sendResponse({ success: true, message: 'pong' });
+                    return true;
                     
                 } else if (message.action === 'inspectPage') {
-                    console.log('Received inspect page command');
                     const inspectionData = this.inspectPage();
                     sendResponse({ success: true, data: inspectionData });
+                    return true;
                     
                 } else if (message.action === 'getScrapedLeads') {
-                    console.log('Received get scraped leads command');
                     sendResponse({ success: true, leads: this.getScrapedLeads() });
+                    return true;
                 }
                 
             } catch (error) {
                 console.error('Error handling message:', error);
                 sendResponse({ success: false, error: error.message });
+                return true;
             }
         });
     }
@@ -81,8 +84,6 @@ class GoogleMapsScraper {
         this.scrapedLeads = [];
         this.scrapedCount = 0;
         
-        console.log('Starting Google Maps scraping with settings:', settings);
-        
         try {
             // Wait for page to be ready
             await this.wait(2000);
@@ -94,7 +95,6 @@ class GoogleMapsScraper {
             console.error('Error in startScraping:', error);
         } finally {
             this.isScraping = false;
-            console.log('Scraping finished');
         }
     }
 
@@ -106,10 +106,11 @@ class GoogleMapsScraper {
                 totalListings: this.getVisibleResults().length,
                 scrollableContainer: this.findScrollableContainer() ? 'Found' : 'Not found',
                 canScroll: this.canScrollFurther(),
+                pageStructure: this.analyzePageStructure(),
+                availableSelectors: this.findAvailableSelectors(),
                 timestamp: new Date().toISOString()
             };
             
-            console.log('Page inspection data:', inspectionData);
             return inspectionData;
             
         } catch (error) {
@@ -193,6 +194,7 @@ class GoogleMapsScraper {
     }
 
     async waitForMapsToLoad() {
+        
         // Wait for Google Maps to fully load
         const checkMapsLoaded = () => {
             // Look for various Google Maps elements
@@ -200,16 +202,18 @@ class GoogleMapsScraper {
                              document.querySelector('input[aria-label*="Search"]') ||
                              document.querySelector('.searchBox');
             
-            const resultsContainer = document.querySelector('.Nv2PK') || 
-                                   document.querySelector('.tH5CWc') ||
-                                   document.querySelector('.THOPZb');
+            // Look for the results container and business listings
+            const resultsContainer = document.querySelector('.Nv2PK.THOPZb.CpccDe') || 
+                                   document.querySelector('.Nv2PK.tH5CWc.THOPZb') ||
+                                   document.querySelector('.Nv2PK');
             
-            if (searchBox || resultsContainer) {
-                console.log('Google Maps loaded, scraper ready');
-                console.log('Search box found:', !!searchBox);
-                console.log('Results container found:', !!resultsContainer);
+            // Look for the "Results" header
+            const resultsHeader = document.querySelector('.fontTitleLarge.IFMGgb');
+            
+            if (searchBox || resultsContainer || resultsHeader) {
                 return true;
             }
+            
             return false;
         };
 
@@ -223,25 +227,28 @@ class GoogleMapsScraper {
                 }, 1000);
             });
         }
+        
     }
 
     stopScraping() {
         this.stopScraping = true;
         this.isScraping = false;
-        console.log('Scraping stopped by user');
     }
 
     getVisibleResults() {
-        // Use the exact selector from the HTML structure
-        const listings = document.querySelectorAll('.Nv2PK.tH5CWc.THOPZb, .Nv2PK.THOPZb.CpccDe, .Nv2PK, .tH5CWc, .THOPZb');
+        
+        // Use the exact selectors from the actual Google Maps HTML structure
+        // Look for the main business listing containers
+        const listings = document.querySelectorAll('.Nv2PK.THOPZb.CpccDe, .Nv2PK.tH5CWc.THOPZb');
         
         // Filter to get unique business listings
         const uniqueListings = [];
         const seen = new Set();
         
         for (const listing of listings) {
-            // Get the business name to identify unique listings
-            const nameElement = listing.querySelector('.qBF1Pd');
+            // Get the business name using the exact selector from the HTML
+            const nameElement = listing.querySelector('.qBF1Pd.fontHeadlineSmall.kiIehc.Hi2drd') || 
+                               listing.querySelector('.qBF1Pd');
             if (nameElement) {
                 const name = nameElement.textContent.trim();
                 if (name && !seen.has(name)) {
@@ -251,7 +258,6 @@ class GoogleMapsScraper {
             }
         }
         
-        console.log(`Found ${uniqueListings.length} unique business listings`);
         return uniqueListings;
     }
 
@@ -261,22 +267,18 @@ class GoogleMapsScraper {
             const listing = this.businessListings[i];
             
             try {
-                console.log(`Processing business ${i + 1}/${this.businessListings.length}`);
                 
                 // Extract basic info from the listing card first
                 const basicInfo = this.extractBasicInfo(listing);
-                console.log('Basic info extracted:', basicInfo);
                 
                 // Click on the listing to open detailed view
                 const detailedInfo = await this.clickAndExtractDetails(listing);
-                console.log('Detailed info extracted:', detailedInfo);
                 
                 // Combine basic and detailed info
                 const lead = { ...basicInfo, ...detailedInfo };
                 
                 if (lead.name && this.isValidBusinessName(lead.name)) {
                     this.scrapedCount++;
-                    console.log('Extracted lead:', lead);
                     chrome.runtime.sendMessage({ 
                         action: 'leadFound', 
                         lead: lead 
@@ -309,106 +311,69 @@ class GoogleMapsScraper {
 
         // Extract business name using the exact selector from the HTML structure
         const nameElement = listing.querySelector('.qBF1Pd.fontHeadlineSmall.kiIehc.Hi2drd') || 
-                           listing.querySelector('.qBF1Pd') ||
-                           listing.querySelector('h1.DUwDvf.lfPIob');
+                           listing.querySelector('.qBF1Pd');
         if (nameElement) {
             info.name = nameElement.textContent.trim();
         }
 
-        // Extract business type - look for the category button or span
-        const typeElement = listing.querySelector('button.DkEaL') ||
-                           listing.querySelector('.W4Efsd span span') ||
-                           listing.querySelector('.W4Efsd button.DkEaL');
+        // Extract business type - look for the first span in W4Efsd (category)
+        const typeElement = listing.querySelector('.W4Efsd span:first-child span') ||
+                           listing.querySelector('.W4Efsd span span:first-child');
         if (typeElement) {
             info.businessType = typeElement.textContent.trim();
         }
 
-        // Extract address - look for the span containing the address (avoiding bullet points and icons)
-        const addressElement = listing.querySelector('.W4Efsd span:last-child') || 
-                             listing.querySelector('.Io6YTe.fontBodyMedium.kR99db.fdkmkc') ||
-                             listing.querySelector('.Io6YTe');
-        
-        if (addressElement) {
-            const addressText = addressElement.textContent.trim();
-            // Filter out text that contains bullet points, icons, or is too short
-            if (addressText && !addressText.includes('·') && !addressText.includes('') && addressText.length > 5) {
+        // Extract address - look for the address span (usually the second or third span in W4Efsd)
+        const addressElements = listing.querySelectorAll('.W4Efsd span');
+        for (let i = 0; i < addressElements.length; i++) {
+            const addressText = addressElements[i].textContent.trim();
+            // Look for text that looks like an address (contains road names, locations, etc.)
+            if (addressText && 
+                addressText.length > 10 && 
+                !addressText.includes('·') && 
+                !addressText.includes('Open') && 
+                !addressText.includes('Closed') &&
+                !addressText.includes('stars') &&
+                !addressText.includes('Reviews') &&
+                !addressText.includes('$$') &&
+                !addressText.includes('$')) {
                 info.address = addressText;
+                break;
             }
         }
 
-        // Extract phone number
-        const phoneElement = listing.querySelector('.UsdlK');
-        if (phoneElement) {
-            info.phone = phoneElement.textContent.trim();
-        }
-
-        // Extract website
-        const websiteElement = listing.querySelector('.lcr4fd') ||
-                              listing.querySelector('a[href*="http"] .Io6YTe');
-        if (websiteElement) {
-            const websiteText = websiteElement.textContent.trim();
-            if (websiteText && websiteText.includes('.')) {
-                info.website = websiteText;
-            }
-        }
-
-        // Extract rating and reviews
-        const ratingElement = listing.querySelector('.MW4etd') ||
-                             listing.querySelector('.fontDisplayLarge');
-        const reviewElement = listing.querySelector('.UY7F9') ||
-                             listing.querySelector('button.GQjSyb span');
-        
+        // Extract rating
+        const ratingElement = listing.querySelector('.MW4etd');
         if (ratingElement) {
-            const rating = ratingElement.textContent.trim();
-            const reviews = reviewElement ? reviewElement.textContent.trim() : '';
-            info.rating = reviews ? `${rating} ${reviews}` : rating;
+            info.rating = ratingElement.textContent.trim();
         }
 
-        // Extract business status (Open/Closed)
-        const statusElement = listing.querySelector('.W4Efsd span span[style*="color"]') ||
-                             listing.querySelector('span[style*="color"]');
+        // Extract status (open/closed) - look for colored text
+        const statusElement = listing.querySelector('.W4Efsd span span[style*="color"]');
         if (statusElement) {
-            const statusText = statusElement.textContent.trim();
-            if (statusText && (statusText.includes('Open') || statusText.includes('Closed'))) {
-                info.status = statusText;
-            }
+            info.status = statusElement.textContent.trim();
         }
 
-        // Extract business hours
-        const hoursElement = listing.querySelector('span[style*="color"] + span') ||
-                            listing.querySelector('.MkV9 span span');
-        if (hoursElement) {
-            const hoursText = hoursElement.textContent.trim();
-            if (hoursText && hoursText.includes('Opens') || hoursText.includes('Closes')) {
+        // Extract hours - look for text containing "Closes" or "Opens"
+        const hoursElements = listing.querySelectorAll('.W4Efsd span');
+        for (let i = 0; i < hoursElements.length; i++) {
+            const hoursText = hoursElements[i].textContent.trim();
+            if (hoursText && (hoursText.includes('Closes') || hoursText.includes('Opens'))) {
                 info.hours = hoursText;
+                break;
             }
         }
 
-        // Extract business description (e.g., "Fashionable boutique for women's apparel")
-        const descriptionElement = listing.querySelector('.W4Efsd span span');
-        if (descriptionElement) {
-            const descriptionText = descriptionElement.textContent.trim();
-            // Look for longer text that might be a description (not business type or status)
-            if (descriptionText && descriptionText.length > 20 && 
-                !descriptionText.includes('·') && 
-                !descriptionText.includes('Open') && 
-                !descriptionText.includes('Closed')) {
-                info.description = descriptionText;
+        // Extract price range ($$)
+        const priceElement = listing.querySelector('.W4Efsd span[aria-label*="priced"]');
+        if (priceElement) {
+            const priceText = priceElement.getAttribute('aria-label');
+            if (priceText) {
+                info.priceRange = priceText.replace('Moderately priced', '$$').replace('Inexpensive', '$').replace('Expensive', '$$$');
             }
         }
 
-        // Extract additional services (e.g., "In-store shopping", "Delivery")
-        const serviceElements = listing.querySelectorAll('.TRbhbd + div');
-        if (serviceElements.length > 0) {
-            serviceElements.forEach(service => {
-                const serviceText = service.textContent.trim();
-                if (serviceText && serviceText.length > 0) {
-                    info.services.push(serviceText);
-                }
-            });
-        }
-
-        return info;
+        return this.cleanBusinessData(info);
     }
 
     async clickAndExtractDetails(listing) {
@@ -419,7 +384,6 @@ class GoogleMapsScraper {
                                    listing.querySelector('a[jsaction*="click"]');
             
             if (!clickableElement) {
-                console.log('No clickable element found for:', listing);
                 return {};
             }
 
@@ -428,13 +392,10 @@ class GoogleMapsScraper {
             const listingBusinessName = this.extractBasicInfo(listing).name;
             
             if (currentBusinessName === listingBusinessName && this.isDetailedPanelOpen()) {
-                console.log('Already viewing this business, extracting info directly...');
                 const detailedInfo = this.extractFromDetailedPanel();
                 return detailedInfo;
             }
 
-            console.log('Clicking on business listing to open detailed panel...');
-            
             // Click on the listing to open detailed view
             clickableElement.click();
             
@@ -444,7 +405,6 @@ class GoogleMapsScraper {
             // Check if panel opened successfully
             const panel = this.findDetailedPanel();
             if (!panel) {
-                console.log('Detailed panel did not open, trying alternative method...');
                 // Try alternative click method
                 clickableElement.dispatchEvent(new MouseEvent('click', {
                     bubbles: true,
@@ -456,10 +416,8 @@ class GoogleMapsScraper {
             
             // Extract information from the detailed panel
             const detailedInfo = this.extractFromDetailedPanel();
-            console.log('Extracted detailed info:', detailedInfo);
             
             // Don't close the panel - keep it open for next business
-            console.log('Keeping detailed panel open for next business...');
             
             return detailedInfo;
             
@@ -544,7 +502,6 @@ class GoogleMapsScraper {
 
     async closeDetailedPanel() {
         try {
-            console.log('Closing detailed panel...');
             
             // Try multiple methods to close the panel
             const closeMethods = [
@@ -602,7 +559,6 @@ class GoogleMapsScraper {
             // Try each method until one works
             for (const method of closeMethods) {
                 if (method()) {
-                    console.log('Panel closed successfully');
                     break;
                 }
             }
@@ -612,19 +568,15 @@ class GoogleMapsScraper {
             
             // Verify panel is closed
             if (!this.findDetailedPanel()) {
-                console.log('Detailed panel closed successfully');
             } else {
-                console.log('Panel may still be open, continuing...');
             }
             
         } catch (error) {
-            console.log('Error closing detailed panel:', error);
         }
     }
 
     async scrapeLeads() {
         if (this.isScraping) {
-            console.log('Scraping already in progress');
             return;
         }
 
@@ -633,15 +585,21 @@ class GoogleMapsScraper {
         this.scrapedLeads = [];
         this.scrapedCount = 0;
         
-        console.log('Starting lead scraping...');
-        
         try {
             // Wait for Google Maps to fully load
             await this.waitForMapsToLoad();
             
+            // Check if we're on the right page
+            if (!this.isOnSearchResultsPage()) {
+                return;
+            }
+            
             // Get initial business listings
             this.businessListings = this.getVisibleResults();
-            console.log(`Initial listings found: ${this.businessListings.length}`);
+            
+            if (this.businessListings.length === 0) {
+                return;
+            }
             
             // Process all available listings
             let processedCount = 0;
@@ -650,21 +608,17 @@ class GoogleMapsScraper {
             while (this.isScraping && !this.stopScraping) {
                 // Get current listings (this will include newly discovered ones)
                 const currentListings = this.getVisibleResults();
-                console.log(`Current total listings available: ${currentListings.length}`);
                 
                 // Process only unprocessed listings
                 const unprocessedListings = currentListings.slice(processedCount);
-                console.log(`Processing ${unprocessedListings.length} new listings`);
                 
                 if (unprocessedListings.length === 0) {
-                    console.log('No new listings to process, attempting to load more...');
                     if (this.canScrollFurther()) {
                         await this.loadMoreListings();
                         // Wait a bit for new content to load
                         await this.wait(2000);
                         continue; // Continue the loop to process new listings
                     } else {
-                        console.log('Cannot scroll further and no new listings, scraping complete');
                         break;
                     }
                 }
@@ -675,15 +629,12 @@ class GoogleMapsScraper {
                     const globalIndex = processedCount + i;
                     
                     try {
-                        console.log(`Processing business ${globalIndex + 1}/${currentListings.length}: ${listing.textContent?.substring(0, 50)}...`);
                         
                         // Extract basic info from the listing card first
                         const basicInfo = this.extractBasicInfo(listing);
-                        console.log('Basic info extracted:', basicInfo);
                         
                         // Click on the listing to open detailed view
                         const detailedInfo = await this.clickAndExtractDetails(listing);
-                        console.log('Detailed info extracted:', detailedInfo);
                         
                         // Combine basic and detailed info
                         const lead = { ...basicInfo, ...detailedInfo };
@@ -697,16 +648,22 @@ class GoogleMapsScraper {
                             if (!isDuplicate) {
                                 this.scrapedCount++;
                                 this.scrapedLeads.push(lead);
-                                console.log(`New lead extracted (${this.scrapedCount} total):`, lead.name);
                                 
                                 // Send message to popup with updated count
-                                chrome.runtime.sendMessage({ 
-                                    action: 'leadFound', 
-                                    lead: lead,
-                                    totalCount: this.scrapedCount
-                                });
-                            } else {
-                                console.log(`Duplicate lead skipped: ${lead.name}`);
+                                try {
+                                    chrome.runtime.sendMessage({ 
+                                        action: 'leadFound', 
+                                        lead: lead,
+                                        totalCount: this.scrapedCount
+                                    }, (response) => {
+                                        if (chrome.runtime.lastError) {
+                                            console.error('Error sending message:', chrome.runtime.lastError);
+                                        } else {
+                                        }
+                                    });
+                                } catch (error) {
+                                    console.error('Error sending leadFound message:', error);
+                                }
                             }
                         }
                         
@@ -722,32 +679,24 @@ class GoogleMapsScraper {
                 processedCount = currentListings.length;
                 totalProcessed += unprocessedListings.length;
                 
-                console.log(`Processed ${totalProcessed} total listings, found ${this.scrapedCount} unique leads`);
-                
                 // Check if we've reached max results
                 if (this.maxResults && this.scrapedCount >= this.maxResults) {
-                    console.log(`Reached maximum results limit: ${this.maxResults}`);
                     break;
                 }
                 
                 // Try to load more listings if we can scroll further
                 if (this.canScrollFurther()) {
-                    console.log('Attempting to load more listings...');
                     await this.loadMoreListings();
                     await this.wait(2000); // Wait for new content
                 } else {
-                    console.log('Cannot scroll further, scraping complete');
                     break;
                 }
             }
-            
-            console.log(`Scraping completed. Total leads found: ${this.scrapedCount}`);
             
         } catch (error) {
             console.error('Error during scraping:', error);
         } finally {
             this.isScraping = false;
-            console.log('Scraping stopped');
         }
     }
 
@@ -770,7 +719,6 @@ class GoogleMapsScraper {
 
     updateProgress(current, total) {
         const progress = Math.round((current / total) * 100);
-        console.log(`Progress: ${current}/${total} (${progress}%)`);
         
         // Send progress update to popup
         chrome.runtime.sendMessage({ 
@@ -792,36 +740,17 @@ class GoogleMapsScraper {
         const hasSearchQuery = currentUrl.includes('search') || currentUrl.includes('place');
         
         // Also check for search results elements
-        const hasSearchResults = document.querySelector('.Nv2PK.tH5CWc.THOPZb') ||
-                                document.querySelector('.Nv2PK.THOPZb.CpccDe') ||
-                                document.querySelector('.Nv2PK');
+        const hasResultsHeader = !!document.querySelector('.fontTitleLarge.IFMGgb');
+        const hasBusinessListings = !!document.querySelector('.Nv2PK.THOPZb.CpccDe, .Nv2PK.tH5CWc.THOPZb, .Nv2PK');
         
-        return isMapsPage && hasSearchQuery && hasSearchResults;
+        return isMapsPage && (hasSearchQuery || hasResultsHeader || hasBusinessListings);
     }
 
     async ensureSearchResultsPage() {
-        // If we're not on search results page, try to go back
         if (!this.isOnSearchResultsPage()) {
-            console.log('Not on search results page, attempting to go back...');
-            
-            try {
-                // Try browser back button
-                window.history.back();
-                await this.wait(2000);
-                
-                // If still not on search results, try to navigate to search
-                if (!this.isOnSearchResultsPage()) {
-                    console.log('Still not on search results, trying to navigate...');
-                    // You might need to implement navigation back to search results
-                    return false;
-                }
-            } catch (error) {
-                console.log('Error navigating back:', error);
-                return false;
-            }
+            return false;
         }
-        
-        return this.isOnSearchResultsPage();
+        return true;
     }
 
     findScrollableContainer() {
@@ -839,7 +768,6 @@ class GoogleMapsScraper {
         for (const selector of selectors) {
             const container = document.querySelector(selector);
             if (container && container.scrollHeight > container.clientHeight) {
-                console.log(`Found scrollable container with selector: ${selector}`);
                 return container;
             }
         }
@@ -848,12 +776,10 @@ class GoogleMapsScraper {
         const allContainers = document.querySelectorAll('.m6QErb, .e07Vkf, .aIFcqe');
         for (const container of allContainers) {
             if (container.scrollHeight > container.clientHeight && container.scrollTop !== undefined) {
-                console.log('Found scrollable container through fallback search');
                 return container;
             }
         }
         
-        console.log('No scrollable container found');
         return null;
     }
 
@@ -871,28 +797,21 @@ class GoogleMapsScraper {
 
     async loadMoreListings() {
         try {
-            console.log('Attempting to load more listings...');
             
             // Find the specific scrollable container for Google Maps results
             const scrollableContainer = this.findScrollableContainer();
             
             if (!scrollableContainer) {
-                console.log('Scrollable container not found');
                 return;
             }
-            
-            console.log('Found scrollable container:', scrollableContainer);
             
             // Get current scroll position
             const currentScrollTop = scrollableContainer.scrollTop;
             const scrollHeight = scrollableContainer.scrollHeight;
             const clientHeight = scrollableContainer.clientHeight;
             
-            console.log(`Current scroll: ${currentScrollTop}, Height: ${scrollHeight}, Client: ${clientHeight}`);
-            
             // Check if we're near the bottom
             if (currentScrollTop + clientHeight >= scrollHeight - 100) {
-                console.log('Already at bottom, no more scrolling needed');
                 return;
             }
             
@@ -918,7 +837,6 @@ class GoogleMapsScraper {
             let newContentLoaded = false;
             
             for (let i = 0; i < scrollStrategies.length && !newContentLoaded; i++) {
-                console.log(`Trying scroll strategy ${i + 1}`);
                 
                 // Execute scroll strategy
                 scrollStrategies[i]();
@@ -929,16 +847,13 @@ class GoogleMapsScraper {
                 // Check if new content was loaded
                 const newScrollHeight = scrollableContainer.scrollHeight;
                 if (newScrollHeight > scrollHeight) {
-                    console.log(`New content loaded with strategy ${i + 1}! Height increased from ${scrollHeight} to ${newScrollHeight}`);
                     newContentLoaded = true;
                     break;
                 } else {
-                    console.log(`Strategy ${i + 1} did not load new content`);
                 }
             }
             
             if (!newContentLoaded) {
-                console.log('No new content loaded after trying all scroll strategies');
             }
             
         } catch (error) {
@@ -950,11 +865,9 @@ class GoogleMapsScraper {
         try {
             // Extract basic info from the listing first
             const basicInfo = this.extractBasicInfo(listing);
-            console.log('Basic info extracted:', basicInfo);
             
             // Now click to open the detailed panel
             const detailedInfo = await this.clickAndExtractDetails(listing);
-            console.log('Detailed info extracted:', detailedInfo);
             
             // Combine all information
             const combinedInfo = { ...basicInfo, ...detailedInfo };
@@ -962,7 +875,6 @@ class GoogleMapsScraper {
             return combinedInfo;
             
         } catch (error) {
-            console.log('Safe extraction failed:', error);
             return this.extractBasicInfo(listing);
         }
     }
@@ -1054,7 +966,6 @@ class GoogleMapsScraper {
     async forceClosePanel() {
         // Force close the panel using multiple aggressive methods
         try {
-            console.log('Force closing panel...');
             
             // Method 1: Multiple escape key presses
             for (let i = 0; i < 3; i++) {
@@ -1089,7 +1000,6 @@ class GoogleMapsScraper {
             }
             
         } catch (error) {
-            console.log('Error in force close:', error);
         }
     }
 }

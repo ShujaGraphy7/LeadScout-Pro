@@ -6,11 +6,39 @@ LeadScout Pro is a powerful Chrome extension designed to extract comprehensive b
 
 ## ✨ Features
 
-### 🚀 **Core Functionality**
-- **Intelligent Lead Extraction** - Automatically identifies and processes business listings
-- **Comprehensive Data Collection** - Captures 8 key business data points
-- **Smart Panel Navigation** - Efficiently extracts detailed information without page reloads
-- **Real-time Progress Tracking** - Monitor extraction progress with live updates
+### Core Functionality
+- **Chrome Extension**: Seamlessly integrates with Google Chrome browser
+- **Google Maps Integration**: Extracts leads directly from Google Maps search results
+- **Business Data Extraction**: Comprehensive data collection including:
+  - Business names and types
+  - Addresses and locations
+  - Phone numbers
+  - Websites
+  - Ratings and reviews
+  - Business status (open/closed)
+  - Operating hours
+  - Business descriptions
+  - Services offered
+- **CSV Export**: Download extracted data in CSV format
+- **Open Source**: Free and open source for everyone to use
+- **Easy to Use**: Simple interface with start/stop controls
+
+### Service Respect & Rate Limiting
+- **Configurable Lead Limits**: Set maximum leads per scraping session (1-100)
+- **Default Safety Limit**: 10 leads per run (prevents server abuse)
+- **Real-Time Progress Tracking**: Monitor progress towards your set limit
+- **Automatic Completion**: Scraper stops gracefully when limit is reached
+- **Server Protection**: Built-in safeguards against overwhelming Google's infrastructure
+- **Ethical Scraping**: Encourages responsible and respectful data collection
+- **User Control**: Customize limits based on your specific needs
+
+### Advanced Features
+- **Click-and-Extract Strategy**: Opens detailed business panels for comprehensive data
+- **Auto-scrolling**: Automatically loads more results to reach your target
+- **Duplicate Prevention**: Smart filtering to avoid duplicate entries
+- **Dynamic Content Handling**: Adapts to Google Maps' lazy loading
+- **Robust Error Handling**: Graceful handling of connection issues and errors
+- **Real-Time Updates**: Live progress updates during scraping operations
 
 ### 🎨 **Modern Design**
 - **Responsive Interface** - Beautiful, mobile-friendly design that adapts to any screen

@@ -10,19 +10,18 @@ document.addEventListener('DOMContentLoaded', function() {
     let scrapedLeads = [];
     let isScraping = false;
 
-    // Load settings
+    // Add event listeners
+    startBtn.addEventListener('click', startScraping);
+    stopBtn.addEventListener('click', stopScraping);
+    exportBtn.addEventListener('click', exportData);
+    inspectPageBtn.addEventListener('click', inspectPage);
+    
+    // Load saved settings
     loadSettings();
 
     // Check if we're on Google Maps
     updateDebugInfo();
 
-    // Event listeners
-    startBtn.addEventListener('click', startScraping);
-    stopBtn.addEventListener('click', stopScraping);
-    exportBtn.addEventListener('click', exportData);
-    debugModeCheckbox.addEventListener('change', toggleDebugMode);
-    inspectPageBtn.addEventListener('click', inspectPage);
-    
     // Update export button text when format changes
     document.getElementById('exportFormat').addEventListener('change', function() {
         const format = this.value;
@@ -51,27 +50,36 @@ document.addEventListener('DOMContentLoaded', function() {
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         try {
             if (message.action === 'leadFound') {
-                console.log('Lead found:', message.lead);
-                
                 // Add the new lead to our list
                 scrapedLeads.push(message.lead);
                 
                 // Update the results display
                 updateResultsList();
                 
-                // Update the status with new count
+                // Get current max leads setting
+                const maxLeads = parseInt(document.getElementById('maxLeads').value) || 10;
+                
+                // Update the status with new count and progress towards limit
                 if (message.totalCount) {
-                    updateStatus(`Scraping in progress... Found ${message.totalCount} leads`);
+                    if (message.totalCount >= maxLeads) {
+                        updateStatus(`Scraping completed! Found ${message.totalCount} leads (Max limit reached)`);
+                    } else {
+                        updateStatus(`Scraping in progress... Found ${message.totalCount}/${maxLeads} leads`);
+                    }
                 } else {
-                    updateStatus(`Scraping in progress... Found ${scrapedLeads.length} leads`);
+                    if (scrapedLeads.length >= maxLeads) {
+                        updateStatus(`Scraping completed! Found ${scrapedLeads.length} leads (Max limit reached)`);
+                    } else {
+                        updateStatus(`Scraping in progress... Found ${scrapedLeads.length}/${maxLeads} leads`);
+                    }
                 }
                 
                 // Send response back
                 sendResponse({ success: true });
                 
             } else if (message.action === 'scrapingComplete') {
-                console.log('Scraping completed');
-                updateStatus(`Scraping completed! Found ${scrapedLeads.length} leads`);
+                const maxLeads = parseInt(document.getElementById('maxLeads').value) || 10;
+                updateStatus(`Scraping completed! Found ${scrapedLeads.length} leads (Max: ${maxLeads})`);
                 
                 // Hide stop button and show start button
                 document.getElementById('startBtn').style.display = 'inline-flex';
@@ -81,8 +89,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 sendResponse({ success: true });
                 
             } else if (message.action === 'scrapingStarted') {
-                console.log('Scraping started');
-                updateStatus('Scraping started...');
+                const maxLeads = parseInt(document.getElementById('maxLeads').value) || 10;
+                updateStatus(`Scraping started... (Max: ${maxLeads} leads)`);
                 
                 // Show stop button and hide start button
                 document.getElementById('startBtn').style.display = 'none';
@@ -92,8 +100,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 sendResponse({ success: true });
                 
             } else if (message.action === 'scrapingStopped') {
-                console.log('Scraping stopped');
-                updateStatus(`Scraping stopped. Found ${scrapedLeads.length} leads`);
+                const maxLeads = parseInt(document.getElementById('maxLeads').value) || 10;
+                updateStatus(`Scraping stopped. Found ${scrapedLeads.length} leads (Max: ${maxLeads})`);
                 
                 // Hide stop button and show start button
                 document.getElementById('startBtn').style.display = 'inline-flex';
@@ -106,11 +114,13 @@ document.addEventListener('DOMContentLoaded', function() {
             console.error('Error handling message:', error);
             sendResponse({ success: false, error: error.message });
         }
+        
+        // Return true to indicate we will send a response asynchronously
+        return true;
     });
 
     async function startScraping() {
         try {
-            console.log('Starting scraping...');
             
             // Check if content script is available
             const isAvailable = await checkContentScriptAvailable();
@@ -119,21 +129,35 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
             
+            // Get settings including max leads
+            const maxLeads = parseInt(document.getElementById('maxLeads').value) || 10;
+            const settings = {
+                maxLeads: Math.max(1, Math.min(50, maxLeads)), // Ensure between 1-50
+                extractPhones: document.getElementById('extractPhones').checked,
+                extractEmails: false, // Email functionality disabled
+                autoScroll: document.getElementById('autoScroll').checked
+            };
+            
+            // Save settings
+            saveSettings(settings);
+            
             // Clear previous results
             scrapedLeads = [];
             updateResultsList();
             
             // Update UI
-            updateStatus('Starting scraper...');
+            updateStatus(`Starting scraper... (Max: ${settings.maxLeads} leads)`);
             document.getElementById('startBtn').style.display = 'none';
             document.getElementById('stopBtn').style.display = 'inline-flex';
             
-            // Send start command to content script
-            const response = await sendMessageToContentScript({ action: 'startScraping' });
+            // Send start command to content script with settings
+            const response = await sendMessageToContentScript({ 
+                action: 'startScraping', 
+                settings: settings 
+            });
             
             if (response && response.success) {
-                updateStatus('Scraping started...');
-                console.log('Scraping started successfully');
+                updateStatus(`Scraping started... (Max: ${settings.maxLeads} leads)`);
             } else {
                 updateStatus('Error starting scraper');
                 document.getElementById('startBtn').style.display = 'inline-flex';
@@ -150,14 +174,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function stopScraping() {
         try {
-            console.log('Stopping scraping...');
             
             // Send stop command to content script
             const response = await sendMessageToContentScript({ action: 'stopScraping' });
             
             if (response && response.success) {
                 updateStatus(`Scraping stopped. Found ${scrapedLeads.length} leads`);
-                console.log('Scraping stopped successfully');
             } else {
                 updateStatus('Error stopping scraper');
             }
@@ -179,8 +201,14 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function updateResultsList() {
+        
         const resultsList = document.getElementById('resultsList');
         const resultsCount = document.getElementById('resultsCount');
+        
+        if (!resultsList || !resultsCount) {
+            console.error('Required DOM elements not found');
+            return;
+        }
         
         resultsCount.textContent = scrapedLeads.length;
         
@@ -201,6 +229,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <p><strong>Services:</strong> ${lead.services && lead.services.length > 0 ? lead.services.join(', ') : 'N/A'}</p>
             </div>
         `).join('');
+        
     }
 
     function updateStatus(status) {
@@ -609,19 +638,29 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function loadSettings() {
-        chrome.storage.sync.get(['extractPhones', 'extractEmails', 'autoScroll', 'debugMode'], (result) => {
-            if (result.extractPhones !== undefined) document.getElementById('extractPhones').checked = result.extractPhones;
-            if (result.extractEmails !== undefined) document.getElementById('extractEmails').checked = result.extractEmails;
-            if (result.autoScroll !== undefined) document.getElementById('autoScroll').checked = result.autoScroll;
-            if (result.debugMode !== undefined) {
-                document.getElementById('debugMode').checked = result.debugMode;
-                debugInfo.style.display = result.debugMode ? 'block' : 'none';
-            }
+        chrome.storage.sync.get({
+            extractPhones: true,
+            extractEmails: false,
+            autoScroll: true,
+            maxLeads: 10
+        }, (settings) => {
+            console.log('Settings loaded:', settings);
+            
+            // Apply settings to UI
+            document.getElementById('extractPhones').checked = settings.extractPhones;
+            document.getElementById('extractEmails').checked = settings.extractEmails;
+            document.getElementById('autoScroll').checked = settings.autoScroll;
+            document.getElementById('maxLeads').value = settings.maxLeads;
+            
+            // Disable email extraction (not available)
+            document.getElementById('extractEmails').disabled = true;
         });
     }
 
     function saveSettings(settings) {
-        chrome.storage.sync.set(settings);
+        chrome.storage.sync.set(settings, () => {
+            console.log('Settings saved:', settings);
+        });
     }
 
     // Check if content script is available

@@ -99,27 +99,29 @@
                 </svg>
             </div>
             <div class="settings-grid">
-                <label class="setting-item">
+                <div class="setting-item">
                     <input type="checkbox" id="extractPhones" checked>
                     <span class="checkmark"></span>
-                    <span class="setting-text">Phone Numbers</span>
-                </label>
-                <label class="setting-item">
+                    <div class="setting-text">Extract Phone Numbers</div>
+                </div>
+                <div class="setting-item">
                     <input type="checkbox" id="extractEmails" disabled>
                     <span class="checkmark disabled"></span>
-                    <span class="setting-text disabled">Email Addresses</span>
-                    <span class="disabled-note">(Coming Soon)</span>
-                </label>
-                <label class="setting-item">
+                    <div class="setting-text disabled">Extract Email Addresses</div>
+                    <span class="disabled-note">(Currently not available)</span>
+                </div>
+                <div class="setting-item">
                     <input type="checkbox" id="autoScroll" checked>
                     <span class="checkmark"></span>
-                    <span class="setting-text">Auto-scroll</span>
-                </label>
-                <label class="setting-item">
-                    <input type="checkbox" id="debugMode">
-                    <span class="checkmark"></span>
-                    <span class="setting-text">Debug Mode</span>
-                </label>
+                    <div class="setting-text">Auto-scroll for More Results</div>
+                </div>
+                <div class="setting-item">
+                    <label for="maxLeads" class="setting-text">Max Leads (1-50):</label>
+                    <input type="number" id="maxLeads" min="1" max="50" value="10" class="max-leads-input">
+                </div>
+            </div>
+            <div class="service-respect-note">
+                <p>⚠️ <strong>Service Respect:</strong> Please set reasonable limits to avoid overwhelming Google's servers. Default limit is 10 leads per run.</p>
             </div>
         </div>
         
