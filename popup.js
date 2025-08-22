@@ -24,44 +24,55 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Listen for messages from content script
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-        if (message.action === 'leadFound') {
-            scrapedLeads.push(message.lead);
-            updateResultsList();
-            updateStatus(`Found ${scrapedLeads.length} leads`);
-        } else if (message.action === 'updateProgress') {
-            updateProgress(`${message.current}/${message.total} leads found`);
-        } else if (message.action === 'scrapingComplete') {
-            isScraping = false;
-            startBtn.style.display = 'inline-block';
-            stopBtn.style.display = 'none';
-            updateStatus('Scraping completed');
+        try {
+            if (message.action === 'leadFound') {
+                scrapedLeads.push(message.lead);
+                updateResultsList();
+                updateStatus(`Found ${scrapedLeads.length} leads`);
+            } else if (message.action === 'updateProgress') {
+                updateProgress(`${message.current}/${message.total} leads found`);
+            } else if (message.action === 'scrapingComplete') {
+                isScraping = false;
+                startBtn.style.display = 'inline-block';
+                stopBtn.style.display = 'none';
+                updateStatus('Scraping completed');
+            }
+        } catch (error) {
+            console.log('Error handling message:', error);
         }
+        
+        // Always send a response to prevent connection errors
+        sendResponse({ success: true });
     });
 
     function startScraping() {
         if (isScraping) return;
 
-        getCurrentTab().then(currentTab => {
+        getCurrentTab().then(async (currentTab) => {
             if (!currentTab) return;
 
-            // Check if we're on Google Maps
             if (!currentTab.url.includes('google.com/maps') && !currentTab.url.includes('maps.google.com')) {
                 alert('Please navigate to Google Maps to start scraping.');
                 return;
             }
 
-            // Get settings
+            // Check if content script is available
+            const contentScriptReady = await checkContentScriptAvailable();
+            if (!contentScriptReady) {
+                alert('Extension is not ready. Please refresh the page and try again.');
+                return;
+            }
+
             const settings = {
                 extractPhones: document.getElementById('extractPhones').checked,
-                extractEmails: document.getElementById('extractEmails').checked,
+                extractEmails: false, // Email functionality disabled
                 autoScroll: document.getElementById('autoScroll').checked
             };
 
-            // Save settings
             saveSettings(settings);
 
-            // Start scraping
-            chrome.tabs.sendMessage(currentTab.id, { action: 'startScraping', settings: settings }, (response) => {
+            try {
+                const response = await sendMessageToContentScript({ action: 'startScraping', settings: settings });
                 if (response && response.success) {
                     isScraping = true;
                     startBtn.style.display = 'none';
@@ -71,24 +82,33 @@ document.addEventListener('DOMContentLoaded', function() {
                 } else {
                     alert('Failed to start scraping. Make sure you\'re on Google Maps.');
                 }
-            });
+            } catch (error) {
+                console.log('Error starting scraping:', error);
+                alert('Failed to start scraping. Please refresh the page and try again.');
+            }
         });
     }
 
     function stopScraping() {
         if (!isScraping) return;
 
-        getCurrentTab().then(currentTab => {
+        getCurrentTab().then(async (currentTab) => {
             if (!currentTab) return;
 
-            chrome.tabs.sendMessage(currentTab.id, { action: 'stopScraping' }, (response) => {
-                if (response && response.success) {
-                    isScraping = false;
-                    startBtn.style.display = 'inline-block';
-                    stopBtn.style.display = 'none';
-                    updateStatus('Scraping stopped');
-                }
-            });
+            try {
+                await sendMessageToContentScript({ action: 'stopScraping' });
+                isScraping = false;
+                startBtn.style.display = 'inline-block';
+                stopBtn.style.display = 'none';
+                updateStatus('Scraping stopped');
+            } catch (error) {
+                console.log('Error stopping scraping:', error);
+                // Even if message fails, update UI
+                isScraping = false;
+                startBtn.style.display = 'inline-block';
+                stopBtn.style.display = 'none';
+                updateStatus('Scraping stopped');
+            }
         });
     }
 
@@ -115,12 +135,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 <p><strong>Type:</strong> ${lead.businessType || 'N/A'}</p>
                 <p><strong>Address:</strong> ${lead.address || 'N/A'}</p>
                 <p><strong>Phone:</strong> ${lead.phone || 'N/A'}</p>
-                <p><strong>Email:</strong> ${lead.email || 'N/A'}</p>
                 <p><strong>Website:</strong> ${lead.website || 'N/A'}</p>
                 <p><strong>Rating:</strong> ${lead.rating || 'N/A'}</p>
-                <p><strong>Status:</strong> ${lead.status || 'N/A'}</p>
                 <p><strong>Hours:</strong> ${lead.hours || 'N/A'}</p>
-                <p><strong>Description:</strong> ${lead.description || 'N/A'}</p>
                 <p><strong>Services:</strong> ${lead.services && lead.services.length > 0 ? lead.services.join(', ') : 'N/A'}</p>
             </div>
         `).join('');
@@ -159,18 +176,15 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function generateCSV() {
-        const headers = ['Business Name', 'Business Type', 'Address', 'Phone', 'Email', 'Website', 'Rating', 'Status', 'Hours', 'Description', 'Services'];
+        const headers = ['Business Name', 'Business Type', 'Address', 'Phone', 'Website', 'Rating', 'Hours', 'Services'];
         const rows = scrapedLeads.map(lead => [
             lead.name || '',
             lead.businessType || '',
             lead.address || '',
             lead.phone || '',
-            lead.email || '',
             lead.website || '',
             lead.rating || '',
-            lead.status || '',
             lead.hours || '',
-            lead.description || '',
             lead.services && lead.services.length > 0 ? lead.services.join('; ') : ''
         ]);
 
@@ -216,21 +230,20 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function inspectPage() {
-        getCurrentTab().then(currentTab => {
+        getCurrentTab().then(async (currentTab) => {
             if (!currentTab) return;
 
-            if (!currentTab.url.includes('google.com/maps') && !currentTab.url.includes('maps.google.com')) {
-                alert('Please navigate to Google Maps to inspect the page.');
-                return;
-            }
-
-            chrome.tabs.sendMessage(currentTab.id, { action: 'inspectPage' }, (response) => {
-                if (response && response.success) {
-                    displayInspectionResults(response);
+            try {
+                const response = await sendMessageToContentScript({ action: 'inspectPage' });
+                if (response && response.data) {
+                    displayInspectionResults(response.data);
                 } else {
-                    alert('Failed to inspect page.');
+                    alert('Failed to inspect page. Please refresh and try again.');
                 }
-            });
+            } catch (error) {
+                console.log('Error inspecting page:', error);
+                alert('Failed to inspect page. Please refresh the page and try again.');
+            }
         });
     }
 
@@ -266,5 +279,52 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function saveSettings(settings) {
         chrome.storage.sync.set(settings);
+    }
+
+    // Check if content script is available
+    async function checkContentScriptAvailable() {
+        try {
+            const currentTab = await getCurrentTab();
+            if (!currentTab) return false;
+            
+            // Try to send a test message to check if content script is ready
+            return new Promise((resolve) => {
+                chrome.tabs.sendMessage(currentTab.id, { action: 'ping' }, (response) => {
+                    if (chrome.runtime.lastError) {
+                        console.log('Content script not ready:', chrome.runtime.lastError.message);
+                        resolve(false);
+                    } else {
+                        resolve(true);
+                    }
+                });
+            });
+        } catch (error) {
+            console.log('Error checking content script:', error);
+            return false;
+        }
+    }
+
+    // Safe message sending with error handling
+    async function sendMessageToContentScript(message) {
+        try {
+            const currentTab = await getCurrentTab();
+            if (!currentTab) {
+                throw new Error('No active tab found');
+            }
+            
+            return new Promise((resolve, reject) => {
+                chrome.tabs.sendMessage(currentTab.id, message, (response) => {
+                    if (chrome.runtime.lastError) {
+                        console.log('Message send error:', chrome.runtime.lastError.message);
+                        reject(new Error(chrome.runtime.lastError.message));
+                    } else {
+                        resolve(response);
+                    }
+                });
+            });
+        } catch (error) {
+            console.log('Error sending message:', error);
+            throw error;
+        }
     }
 });

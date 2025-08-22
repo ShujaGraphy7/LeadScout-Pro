@@ -41,6 +41,11 @@ class GoogleMapsScraper {
                     sendResponse({ data: inspectionData });
                     break;
                     
+                case 'ping':
+                    // Respond to availability check
+                    sendResponse({ success: true, message: 'Content script ready' });
+                    break;
+                    
                 default:
                     sendResponse({ success: false, error: 'Unknown action' });
             }

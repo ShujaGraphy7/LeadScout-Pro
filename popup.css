@@ -259,6 +259,19 @@ h1 {
     text-decoration: underline;
 }
 
+.disabled-note {
+    color: #999;
+    font-size: 11px;
+    font-style: italic;
+    margin-left: 5px;
+}
+
+/* Style disabled checkboxes */
+input[type="checkbox"]:disabled + span {
+    color: #999;
+    opacity: 0.7;
+}
+
 /* Scrollbar styling */
 #resultsList::-webkit-scrollbar {
     width: 6px;
