@@ -16,11 +16,36 @@ document.addEventListener('DOMContentLoaded', function() {
     // Check if we're on Google Maps
     updateDebugInfo();
 
+    // Event listeners
     startBtn.addEventListener('click', startScraping);
     stopBtn.addEventListener('click', stopScraping);
-    exportBtn.addEventListener('click', exportCSV);
+    exportBtn.addEventListener('click', exportData);
     debugModeCheckbox.addEventListener('change', toggleDebugMode);
     inspectPageBtn.addEventListener('click', inspectPage);
+    
+    // Update export button text when format changes
+    document.getElementById('exportFormat').addEventListener('change', function() {
+        const format = this.value;
+        const exportBtn = document.getElementById('exportBtn');
+        if (format === 'xls') {
+            exportBtn.innerHTML = `
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <path d="M14 10V12A2 2 0 0 1 12 14H4A2 2 0 0 1 2 12V10M14 10L12 8M14 10L10 14M2 10L4 8M2 10L6 14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                Export XLS
+            `;
+        } else {
+            exportBtn.innerHTML = `
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <path d="M8 1V11M8 11L4 7M8 11L12 7M2 15H14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                Export CSV
+            `;
+        }
+    });
+    
+    // Initialize button text
+    document.getElementById('exportFormat').dispatchEvent(new Event('change'));
 
     // Listen for messages from content script
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -159,7 +184,22 @@ document.addEventListener('DOMContentLoaded', function() {
         updateProgress(`${scrapedLeads.length} leads found`);
     }
 
-    function exportCSV() {
+    function exportData() {
+        if (scrapedLeads.length === 0) {
+            alert('No leads to export!');
+            return;
+        }
+
+        const format = document.getElementById('exportFormat').value;
+        
+        if (format === 'xls') {
+            exportXLS();
+        } else {
+            exportCSV();
+        }
+    }
+
+    function exportXLS() {
         if (scrapedLeads.length === 0) {
             alert('No leads to export!');
             return;
@@ -330,6 +370,131 @@ document.addEventListener('DOMContentLoaded', function() {
         const url = URL.createObjectURL(blob);
         link.setAttribute('href', url);
         link.setAttribute('download', `leadscout-pro-leads-${new Date().toISOString().split('T')[0]}.xls`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    function exportCSV() {
+        if (scrapedLeads.length === 0) {
+            alert('No leads to export!');
+            return;
+        }
+
+        // Create modern branded CSV content
+        let csvContent = '';
+        
+        // Add branding header
+        csvContent += '================================================================================\n';
+        csvContent += '                    LeadScout Pro - Business Intelligence Report                  \n';
+        csvContent += '                              Professional Lead Analysis                          \n';
+        csvContent += '================================================================================\n\n';
+        csvContent += 'Generated on: ' + new Date().toLocaleString() + '\n';
+        csvContent += 'Total Leads Extracted: ' + scrapedLeads.length + '\n';
+        csvContent += 'Search Target: Google Maps Business Listings\n';
+        csvContent += '================================================================================\n\n';
+        
+        // Add data headers with modern formatting
+        csvContent += 'BUSINESS INFORMATION DATABASE\n';
+        csvContent += '--------------------------------------------------------------------------------\n';
+        csvContent += 'Name,Type,Address,Phone,Website,Rating,Status\n';
+        
+        // Add lead data
+        scrapedLeads.forEach((lead, index) => {
+            const row = [
+                lead.name || 'N/A',
+                lead.businessType || 'N/A',
+                lead.address || 'N/A',
+                lead.phone || 'N/A',
+                lead.website || 'N/A',
+                lead.rating || 'N/A',
+                lead.status || 'N/A'
+            ].map(field => `"${field}"`).join(',');
+            csvContent += row + '\n';
+        });
+        
+        // Add branding analysis report
+        csvContent += '\n' + '================================================================================\n';
+        csvContent += '                        BRANDING ANALYSIS REPORT                                   \n';
+        csvContent += '                              Market Intelligence                                  \n';
+        csvContent += '================================================================================\n\n';
+        
+        // Business type analysis
+        const businessTypes = {};
+        scrapedLeads.forEach(lead => {
+            if (lead.businessType) {
+                businessTypes[lead.businessType] = (businessTypes[lead.businessType] || 0) + 1;
+            }
+        });
+        
+        csvContent += 'BUSINESS TYPE DISTRIBUTION ANALYSIS\n';
+        csvContent += '------------------------------------------------------------------\n';
+        Object.entries(businessTypes)
+            .sort(([,a], [,b]) => b - a)
+            .forEach(([type, count]) => {
+                const percentage = ((count / scrapedLeads.length) * 100).toFixed(1);
+                const barLength = Math.round((count / scrapedLeads.length) * 20);
+                const bar = '#'.repeat(barLength) + '-'.repeat(20 - barLength);
+                csvContent += `${type}: ${count} (${percentage}%) ${bar}\n`;
+            });
+        
+        // Rating analysis
+        const ratings = scrapedLeads.filter(lead => lead.rating && lead.rating !== 'N/A');
+        if (ratings.length > 0) {
+            const avgRating = ratings.reduce((sum, lead) => {
+                const rating = parseFloat(lead.rating);
+                return isNaN(rating) ? sum : sum + rating;
+            }, 0) / ratings.length;
+            
+            csvContent += '\nRATING PERFORMANCE ANALYSIS\n';
+            csvContent += '----------------------------------------\n';
+            csvContent += `Average Rating: ${avgRating.toFixed(1)}/5.0 (${'*'.repeat(Math.round(avgRating))})\n`;
+            csvContent += `Businesses with Ratings: ${ratings.length}/${scrapedLeads.length} (${((ratings.length/scrapedLeads.length)*100).toFixed(1)}%)\n`;
+        }
+        
+        // Status analysis
+        const openBusinesses = scrapedLeads.filter(lead => 
+            lead.status && lead.status.toLowerCase().includes('open')
+        ).length;
+        const closedBusinesses = scrapedLeads.filter(lead => 
+            lead.status && lead.status.toLowerCase().includes('closed')
+        ).length;
+        
+        csvContent += '\nBUSINESS STATUS OVERVIEW\n';
+        csvContent += '-----------------------------------\n';
+        csvContent += `Open Businesses: ${openBusinesses} (${((openBusinesses/scrapedLeads.length)*100).toFixed(1)}%)\n`;
+        csvContent += `Closed Businesses: ${closedBusinesses} (${((closedBusinesses/scrapedLeads.length)*100).toFixed(1)}%)\n`;
+        csvContent += `Status Unknown: ${scrapedLeads.length - openBusinesses - closedBusinesses} (${(((scrapedLeads.length - openBusinesses - closedBusinesses)/scrapedLeads.length)*100).toFixed(1)}%)\n`;
+        
+        // Contact information analysis
+        const withPhone = scrapedLeads.filter(lead => lead.phone && lead.phone !== 'N/A').length;
+        const withWebsite = scrapedLeads.filter(lead => lead.website && lead.website !== 'N/A').length;
+        
+        csvContent += '\nCONTACT INFORMATION COVERAGE\n';
+        csvContent += '---------------------------------------------\n';
+        csvContent += `With Phone Numbers: ${withPhone}/${scrapedLeads.length} (${((withPhone/scrapedLeads.length)*100).toFixed(1)}%)\n`;
+        csvContent += `With Websites: ${withWebsite}/${scrapedLeads.length} (${((withWebsite/scrapedLeads.length)*100).toFixed(1)}%)\n`;
+        
+        // Footer with branding
+        csvContent += '\n' + '================================================================================\n';
+        csvContent += '                              REPORT SUMMARY                                        \n';
+        csvContent += '================================================================================\n\n';
+        csvContent += 'Report generated by LeadScout Pro\n';
+        csvContent += 'Developed with love by hashnetics\n';
+        csvContent += 'Open Source - Free for Everyone - Chrome Extension\n';
+        csvContent += 'Support: https://hashnetics.com\n';
+        csvContent += 'Star us on GitHub: https://github.com/ShujaGraphy7/LeadScout-Pro\n';
+        csvContent += '\n' + '='.repeat(80) + '\n';
+        csvContent += 'Thank you for using LeadScout Pro!\n';
+        csvContent += '='.repeat(80) + '\n';
+        
+        // Create and download file
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `leadscout-pro-leads-${new Date().toISOString().split('T')[0]}.csv`);
         link.style.visibility = 'hidden';
         document.body.appendChild(link);
         link.click();

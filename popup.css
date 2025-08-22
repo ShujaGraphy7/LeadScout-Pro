@@ -553,3 +553,39 @@ body {
     transform: none !important;
     box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
 }
+
+.export-controls {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.format-selector {
+    padding: 8px 12px;
+    border: 2px solid #3498db;
+    border-radius: 8px;
+    background: #2c3e50;
+    color: #ecf0f1;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    min-width: 120px;
+}
+
+.format-selector:hover {
+    border-color: #2980b9;
+    background: #34495e;
+}
+
+.format-selector:focus {
+    outline: none;
+    border-color: #3498db;
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
+}
+
+.format-selector option {
+    background: #2c3e50;
+    color: #ecf0f1;
+    padding: 8px;
+}

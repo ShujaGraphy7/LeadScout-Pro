@@ -38,22 +38,28 @@
             <div class="controls">
                 <button id="startBtn" class="btn btn-primary">
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                        <path d="M4 2L12 8L4 14V2Z" fill="currentColor"/>
+                        <path d="M8 1V15M1 8H15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                     </svg>
                     Start Scraping
                 </button>
                 <button id="stopBtn" class="btn btn-danger" style="display: none;">
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                        <rect x="4" y="4" width="8" height="8" fill="currentColor"/>
+                        <path d="M4 4L12 12M12 4L4 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                     </svg>
                     Stop Scraping
                 </button>
-                <button id="exportBtn" class="btn btn-success">
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                        <path d="M8 1V11M8 11L4 7M8 11L12 7M2 15H14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                    Export XLS
-                </button>
+                <div class="export-controls">
+                    <select id="exportFormat" class="format-selector">
+                        <option value="xls">📊 XLS (Excel)</option>
+                        <option value="csv">📄 CSV (Simple)</option>
+                    </select>
+                    <button id="exportBtn" class="btn btn-success">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                            <path d="M14 10V12A2 2 0 0 1 12 14H4A2 2 0 0 1 2 12V10M14 10L12 8M14 10L10 14M2 10L4 8M2 10L6 14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        Export Data
+                    </button>
+                </div>
             </div>
         </div>
         
