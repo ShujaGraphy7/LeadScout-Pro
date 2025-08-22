@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Google Maps Leads Scraper",
+  "name": "LeadScout Pro",
   "version": "1.0",
   "description": "Extract business leads from Google Maps search results",
   "permissions": [
@@ -26,7 +26,7 @@
   ],
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Google Maps Leads Scraper"
+    "default_title": "LeadScout Pro"
   },
   "icons": {
     "16": "icons/icon16.png",

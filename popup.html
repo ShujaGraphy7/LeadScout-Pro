@@ -2,65 +2,173 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Google Maps Leads Scraper</title>
+    <title>LeadScout Pro</title>
     <link rel="stylesheet" href="popup.css">
 </head>
 <body>
     <div class="container">
-        <h1>Google Maps Leads Scraper</h1>
-        
-        <div class="controls">
-            <button id="startBtn" class="btn btn-primary">Start Scraping</button>
-            <button id="stopBtn" class="btn btn-danger" style="display: none;">Stop Scraping</button>
-            <button id="exportBtn" class="btn btn-success">Export CSV</button>
+        <!-- Header with Logo and Title -->
+        <div class="header">
+            <div class="logo">
+                <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                    <circle cx="16" cy="16" r="15" fill="url(#gradient1)" stroke="url(#gradient2)" stroke-width="2"/>
+                    <path d="M8 12L16 20L24 12" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <circle cx="16" cy="8" r="3" fill="white"/>
+                    <circle cx="16" cy="24" r="3" fill="white"/>
+                    <defs>
+                        <linearGradient id="gradient1" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" style="stop-color:#667eea"/>
+                            <stop offset="100%" style="stop-color:#764ba2"/>
+                        </linearGradient>
+                        <linearGradient id="gradient2" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" style="stop-color:#f093fb"/>
+                            <stop offset="100%" style="stop-color:#f5576c"/>
+                        </linearGradient>
+                    </defs>
+                </svg>
+            </div>
+            <div class="title-section">
+                <h1>LeadScout Pro</h1>
+                <p class="subtitle">Business Intelligence Extractor</p>
+            </div>
         </div>
         
-        <div class="status">
-            <p id="statusText">Ready to scrape</p>
-            <p id="progressText"></p>
+        <!-- Main Controls -->
+        <div class="controls-section">
+            <div class="controls">
+                <button id="startBtn" class="btn btn-primary">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                        <path d="M4 2L12 8L4 14V2Z" fill="currentColor"/>
+                    </svg>
+                    Start Scraping
+                </button>
+                <button id="stopBtn" class="btn btn-danger" style="display: none;">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                        <rect x="4" y="4" width="8" height="8" fill="currentColor"/>
+                    </svg>
+                    Stop Scraping
+                </button>
+                <button id="exportBtn" class="btn btn-success">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                        <path d="M8 1V11M8 11L4 7M8 11L12 7M2 15H14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    Export CSV
+                </button>
+            </div>
         </div>
         
-        <div class="results">
-            <h3>Scraped Leads (<span id="resultsCount">0</span>)</h3>
-            <div id="resultsList"></div>
+        <!-- Status Section -->
+        <div class="status-section">
+            <div class="status-card">
+                <div class="status-icon">
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                        <circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="2"/>
+                        <path d="M10 6V10L13 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </div>
+                <div class="status-content">
+                    <p id="statusText" class="status-text">Ready to extract leads</p>
+                    <p id="progressText" class="progress-text"></p>
+                </div>
+            </div>
         </div>
         
-        <div class="settings">
-            <h3>Settings</h3>
-            <label>
-                <input type="checkbox" id="extractPhones" checked>
-                Extract Phone Numbers
-            </label>
-            <label>
-                <input type="checkbox" id="extractEmails" disabled>
-                Extract Email Addresses <span class="disabled-note">(Currently not available)</span>
-            </label>
-            <label>
-                <input type="checkbox" id="autoScroll" checked>
-                Auto-scroll for More Results
-            </label>
-            <label>
-                <input type="checkbox" id="debugMode">
-                Debug Mode
-            </label>
+        <!-- Results Section -->
+        <div class="results-section">
+            <div class="results-header">
+                <h3>Extracted Leads</h3>
+                <div class="results-count">
+                    <span id="resultsCount">0</span>
+                </div>
+            </div>
+            <div id="resultsList" class="results-list"></div>
         </div>
         
-        <div id="debugInfo" class="debug-info" style="display: none;">
-            <h3>Debug Information</h3>
-            <p><strong>Current URL:</strong> <span id="currentUrl"></span></p>
-            <p><strong>Google Maps Detected:</strong> <span id="mapsDetected"></span></p>
-            <p><strong>Visible Results:</strong> <span id="visibleResults"></span></p>
-            <p><strong>Last Error:</strong> <span id="lastError"></span></p>
-            <button id="inspectPage" class="btn btn-info">Inspect Page</button>
+        <!-- Settings Section -->
+        <div class="settings-section">
+            <div class="settings-header">
+                <h3>Configuration</h3>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <path d="M8 1V3M8 13V15M3 8H1M15 8H13M3.5 3.5L5.5 5.5M10.5 10.5L12.5 12.5M3.5 12.5L5.5 10.5M10.5 5.5L12.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+            </div>
+            <div class="settings-grid">
+                <label class="setting-item">
+                    <input type="checkbox" id="extractPhones" checked>
+                    <span class="checkmark"></span>
+                    <span class="setting-text">Phone Numbers</span>
+                </label>
+                <label class="setting-item">
+                    <input type="checkbox" id="extractEmails" disabled>
+                    <span class="checkmark disabled"></span>
+                    <span class="setting-text disabled">Email Addresses</span>
+                    <span class="disabled-note">(Coming Soon)</span>
+                </label>
+                <label class="setting-item">
+                    <input type="checkbox" id="autoScroll" checked>
+                    <span class="checkmark"></span>
+                    <span class="setting-text">Auto-scroll</span>
+                </label>
+                <label class="setting-item">
+                    <input type="checkbox" id="debugMode">
+                    <span class="checkmark"></span>
+                    <span class="setting-text">Debug Mode</span>
+                </label>
+            </div>
         </div>
         
-        <div id="inspectionResults" class="inspection-results" style="display: none;">
-            <h3>Page Inspection Results</h3>
-            <div id="inspectionData"></div>
+        <!-- Debug Section -->
+        <div id="debugInfo" class="debug-section" style="display: none;">
+            <div class="debug-header">
+                <h3>Debug Information</h3>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <path d="M8 1C4.13 1 1 4.13 1 8C1 11.87 4.13 15 8 15C11.87 15 15 11.87 15 8C15 4.13 11.87 1 8 1ZM8 13C5.24 13 3 10.76 3 8C3 5.24 5.24 3 8 3C10.76 3 13 5.24 13 8C13 10.76 10.76 13 8 13Z" fill="currentColor"/>
+                    <path d="M8 5V8M8 11H8.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+            </div>
+            <div class="debug-content">
+                <div class="debug-item">
+                    <span class="debug-label">Current URL:</span>
+                    <span id="currentUrl" class="debug-value"></span>
+                </div>
+                <div class="debug-item">
+                    <span class="debug-label">Google Maps:</span>
+                    <span id="mapsDetected" class="debug-value"></span>
+                </div>
+                <div class="debug-item">
+                    <span class="debug-label">Visible Results:</span>
+                    <span id="visibleResults" class="debug-value"></span>
+                </div>
+                <div class="debug-item">
+                    <span class="debug-label">Last Error:</span>
+                    <span id="lastError" class="debug-value"></span>
+                </div>
+            </div>
+            <button id="inspectPage" class="btn btn-info">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <path d="M1 1H7V7H1V1ZM9 1H15V7H9V1ZM1 9H7V15H1V9ZM9 9H15V15H9V9Z" stroke="currentColor" stroke-width="1.5"/>
+                </svg>
+                Inspect Page
+            </button>
         </div>
         
+        <!-- Inspection Results -->
+        <div id="inspectionResults" class="inspection-section" style="display: none;">
+            <div class="inspection-header">
+                <h3>Page Inspection Results</h3>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <path d="M14 2H2V14H14V2ZM6 4H10V6H6V4ZM4 8H12V10H4V8ZM6 12H10V14H6V12Z" fill="currentColor"/>
+                </svg>
+            </div>
+            <div id="inspectionData" class="inspection-content"></div>
+        </div>
+        
+        <!-- Developer Info -->
         <div class="developer-info">
-            <p>Developed by <a href="https://hashnetics.com" target="_blank">hashnetics</a></p>
+            <div class="developer-content">
+                <p>Developed with ❤️ by <a href="https://hashnetics.com" target="_blank">hashnetics</a></p>
+                <div class="version">v0.5</div>
+            </div>
         </div>
     </div>
     
