@@ -16,6 +16,77 @@ document.addEventListener('DOMContentLoaded', function() {
     exportBtn.addEventListener('click', exportData);
     inspectPageBtn.addEventListener('click', inspectPage);
     
+    // Add configuration event listeners
+    document.getElementById('extractPhones').addEventListener('change', function() {
+        saveSettingsOnChange();
+        showConfigurationFeedback('Phone extraction setting updated');
+    });
+    
+    document.getElementById('autoScroll').addEventListener('change', function() {
+        saveSettingsOnChange();
+        showConfigurationFeedback('Auto-scroll setting updated');
+    });
+    
+    document.getElementById('maxLeads').addEventListener('input', function() {
+        // Validate input
+        const value = parseInt(this.value);
+        if (value < 1) this.value = 1;
+        if (value > 50) this.value = 50;
+        
+        saveSettingsOnChange();
+        showConfigurationFeedback(`Max leads limit set to ${this.value}`);
+    });
+
+    // Add click event listeners for custom checkboxes
+    document.addEventListener('click', function(e) {
+        console.log('Click detected on:', e.target.tagName, e.target.className);
+        
+        // Find the closest setting-item container
+        const settingItem = e.target.closest('.setting-item');
+        if (!settingItem) {
+            console.log('No setting-item found');
+            return;
+        }
+        
+        console.log('Setting item found:', settingItem);
+        
+        // Find the checkbox within this setting item
+        const checkbox = settingItem.querySelector('input[type="checkbox"]');
+        if (!checkbox) {
+            console.log('No checkbox found in setting item');
+            return;
+        }
+        
+        if (checkbox.disabled) {
+            console.log('Checkbox is disabled:', checkbox.id);
+            return;
+        }
+        
+        console.log('Custom checkbox clicked:', checkbox.id, 'Current state:', checkbox.checked);
+        
+        // Toggle the checkbox state
+        checkbox.checked = !checkbox.checked;
+        
+        console.log('New state:', checkbox.checked);
+        
+        // Trigger the change event to save settings
+        checkbox.dispatchEvent(new Event('change'));
+    });
+
+    // Test if the event listener is working
+    console.log('Custom checkbox event listener attached');
+    
+    // Test click on a setting item
+    setTimeout(() => {
+        const testSettingItem = document.querySelector('.setting-item');
+        if (testSettingItem) {
+            console.log('Test setting item found:', testSettingItem);
+            console.log('Test checkbox found:', testSettingItem.querySelector('input[type="checkbox"]'));
+        } else {
+            console.log('No setting items found');
+        }
+    }, 1000);
+    
     // Load saved settings
     loadSettings();
 
@@ -661,6 +732,27 @@ document.addEventListener('DOMContentLoaded', function() {
         chrome.storage.sync.set(settings, () => {
             console.log('Settings saved:', settings);
         });
+    }
+
+    function saveSettingsOnChange() {
+        const settings = {
+            extractPhones: document.getElementById('extractPhones').checked,
+            extractEmails: false, // Email functionality disabled
+            autoScroll: document.getElementById('autoScroll').checked,
+            maxLeads: parseInt(document.getElementById('maxLeads').value) || 10
+        };
+        saveSettings(settings);
+    }
+
+    function showConfigurationFeedback(message) {
+        const feedbackElement = document.getElementById('configurationFeedback');
+        if (feedbackElement) {
+            feedbackElement.textContent = message;
+            feedbackElement.style.display = 'block';
+            setTimeout(() => {
+                feedbackElement.style.display = 'none';
+            }, 3000); // Hide after 3 seconds
+        }
     }
 
     // Check if content script is available

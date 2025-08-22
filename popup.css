@@ -284,6 +284,9 @@ body {
     transition: background 0.3s ease;
     background: #2c3e50;
     border: 1px solid #34495e;
+    position: relative;
+    z-index: 1;
+    pointer-events: auto;
 }
 
 .setting-item:hover {
@@ -303,6 +306,8 @@ body {
     position: relative;
     transition: all 0.3s ease;
     background: #2c3e50;
+    pointer-events: auto;
+    cursor: pointer;
 }
 
 .checkmark.disabled {
@@ -330,6 +335,8 @@ body {
     font-size: 13px;
     color: #ecf0f1;
     font-weight: 500;
+    pointer-events: auto;
+    cursor: pointer;
 }
 
 .setting-text.disabled {
